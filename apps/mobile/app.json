@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Moajam",
+    "slug": "moajam",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.moajam.app" },
+    "android": { "package": "com.moajam.app" }
+  }
+}
