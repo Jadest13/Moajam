@@ -1,0 +1,1502 @@
+openapi: 3.1.0
+info:
+  title: Moajam API
+  version: 0.1.0
+  description: |
+    밴드 Workspace의 곡 추천, 채택, 연습, 자료와 합주 기록을 위한 API.
+    상세 설계 원칙은 `docs/api-design.md`를 따른다.
+servers:
+  - url: /v1
+    description: Current origin
+security:
+  - bearerAuth: []
+tags:
+  - name: Me
+  - name: Workspaces
+  - name: Members
+  - name: Recommendations
+  - name: Songs
+  - name: Opinions
+  - name: Decisions
+  - name: Checklists
+  - name: Uploads
+  - name: Resources
+  - name: Timeline
+  - name: Practice
+  - name: Rehearsals
+
+paths:
+  /me:
+    get:
+      tags: [Me]
+      operationId: getMe
+      summary: 현재 사용자 조회
+      responses:
+        '200':
+          description: 현재 사용자
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces:
+    get:
+      tags: [Workspaces]
+      operationId: listWorkspaces
+      summary: 내가 참여한 Workspace 목록
+      responses:
+        '200':
+          description: Workspace 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Workspace' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Workspaces]
+      operationId: createWorkspace
+      summary: Workspace 생성
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workspace' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/overview:
+    get:
+      tags: [Workspaces]
+      operationId: getWorkspaceOverview
+      summary: 홈 Dashboard 조회 모델
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: Dashboard 데이터
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkspaceOverview' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/members:
+    get:
+      tags: [Members]
+      operationId: listWorkspaceMembers
+      summary: 멤버 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+      responses:
+        '200':
+          description: 멤버 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkspaceMember' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations:
+    get:
+      tags: [Recommendations]
+      operationId: listRecommendations
+      summary: 추천곡 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/RecommendationStatus' }
+      responses:
+        '200':
+          description: 추천곡 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationPage' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Recommendations]
+      operationId: createRecommendation
+      summary: 곡 추천
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRecommendationRequest' }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recommendation' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}:
+    get:
+      tags: [Recommendations]
+      operationId: getRecommendation
+      summary: 추천곡 상세
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+      responses:
+        '200':
+          description: 추천곡
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recommendation' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}/like:
+    put:
+      tags: [Recommendations]
+      operationId: setRecommendationLike
+      summary: 내 좋아요 상태 설정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BooleanStateRequest' }
+      responses:
+        '200':
+          description: 갱신된 집계
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationReactionSummary' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}/adoption-vote:
+    put:
+      tags: [Recommendations]
+      operationId: setRecommendationAdoptionVote
+      summary: 내 채택 추천 상태 설정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BooleanStateRequest' }
+      responses:
+        '200':
+          description: 갱신된 집계
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecommendationReactionSummary' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}/comments:
+    get:
+      tags: [Recommendations]
+      operationId: listRecommendationComments
+      summary: 추천곡 댓글 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 댓글 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentPage' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Recommendations]
+      operationId: createRecommendationComment
+      summary: 추천곡 댓글 작성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}/adoption:
+    post:
+      tags: [Recommendations]
+      operationId: adoptRecommendation
+      summary: 추천곡 채택 및 Song 생성
+      description: Owner 전용. 동일 추천곡에서는 Song을 한 번만 만든다.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key: { type: string, maxLength: 20 }
+                bpm: { type: integer, minimum: 20, maximum: 400 }
+      responses:
+        '201':
+          description: 채택되어 생성된 Song
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Song' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/recommendations/{recommendationId}/hold:
+    put:
+      tags: [Recommendations]
+      operationId: holdRecommendation
+      summary: 추천곡 보류 상태 설정
+      description: Owner 전용.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/RecommendationId'
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recommendation' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs:
+    get:
+      tags: [Songs]
+      operationId: listSongs
+      summary: 채택곡 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 곡 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SongPage' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}:
+    get:
+      tags: [Songs]
+      operationId: getSong
+      summary: Song Workspace 개요
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      responses:
+        '200':
+          description: 곡 상세
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Song' }
+        default: { $ref: '#/components/responses/Problem' }
+    patch:
+      tags: [Songs]
+      operationId: updateSong
+      summary: 곡 기본 정보 수정
+      description: Owner 전용.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                artist: { type: string, minLength: 1, maxLength: 200 }
+                key: { type: string, maxLength: 20 }
+                bpm: { type: integer, minimum: 20, maximum: 400 }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Song' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/parts:
+    post:
+      tags: [Songs]
+      operationId: assignSongPart
+      summary: 곡 파트 배정
+      description: Owner 전용.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [part, displayName, memberId]
+              properties:
+                part: { $ref: '#/components/schemas/MemberPart' }
+                displayName: { type: string, minLength: 1, maxLength: 80 }
+                memberId: { type: string }
+      responses:
+        '201':
+          description: 배정됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SongPart' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/parts/{partId}/preparation:
+    put:
+      tags: [Songs]
+      operationId: setPartPreparation
+      summary: 내 담당 파트 준비 상태 설정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: partId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/PreparationStatus' }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SongPart' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/opinions:
+    get:
+      tags: [Opinions]
+      operationId: listOpinions
+      summary: 구조화된 곡 의견 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/OpinionType' }
+      responses:
+        '200':
+          description: 의견 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpinionPage' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Opinions]
+      operationId: createOpinion
+      summary: 곡 의견 작성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, content]
+              properties:
+                type: { $ref: '#/components/schemas/OpinionType' }
+                content: { type: string, minLength: 1, maxLength: 5000 }
+                parentId: { type: string, description: 답글 대상 Opinion ID }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Opinion' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/decisions:
+    get:
+      tags: [Decisions]
+      operationId: listDecisions
+      summary: 곡 Decision 이력
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      responses:
+        '200':
+          description: Decision 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Decision' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Decisions]
+      operationId: createDecision
+      summary: 공식 Decision 생성
+      description: Owner 전용.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 5000 }
+                sourceOpinionId: { type: string }
+                sourceTimelineCommentId: { type: string }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Decision' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/checklist-items:
+    post:
+      tags: [Checklists]
+      operationId: createChecklistItem
+      summary: 다음 합주 Checklist 항목 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 1000 }
+                sourceDecisionId: { type: string }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChecklistItem' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/checklist-items/{itemId}/completion:
+    put:
+      tags: [Checklists]
+      operationId: setChecklistItemCompletion
+      summary: Checklist 완료 상태 설정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BooleanStateRequest' }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChecklistItem' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/upload-sessions:
+    post:
+      tags: [Uploads]
+      operationId: createSongUploadSession
+      summary: 곡 자료 직접 업로드 세션 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUploadSessionRequest' }
+      responses:
+        '201':
+          description: 업로드 세션
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadSession' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/upload-sessions/{uploadSessionId}/complete:
+    post:
+      tags: [Uploads]
+      operationId: completeSongUpload
+      summary: 업로드 검증 및 Resource 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: 생성된 Resource
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SongResource' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/resources:
+    get:
+      tags: [Resources]
+      operationId: listSongResources
+      summary: 곡 자료 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: type
+          in: query
+          schema: { $ref: '#/components/schemas/ResourceType' }
+      responses:
+        '200':
+          description: 자료 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/SongResource' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Resources]
+      operationId: createSongReference
+      summary: 외부 Reference 등록
+      description: YouTube 등 외부 URL을 Reference로만 저장한다.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, name, externalUrl]
+              properties:
+                type:
+                  type: string
+                  const: REFERENCE
+                name: { type: string, minLength: 1, maxLength: 200 }
+                externalUrl: { type: string, format: uri }
+                description: { type: string, maxLength: 2000 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SongResource' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/timeline-sources/{timelineSourceId}/comments:
+    get:
+      tags: [Timeline]
+      operationId: listTimelineComments
+      summary: Timeline Comment 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: timelineSourceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Comment 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TimelineComment' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Timeline]
+      operationId: createTimelineComment
+      summary: Point 또는 Range Comment 작성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: timelineSourceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startTimeMs, content]
+              properties:
+                startTimeMs: { type: integer, minimum: 0 }
+                endTimeMs: { type: integer, minimum: 0 }
+                label: { type: string, maxLength: 80 }
+                content: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TimelineComment' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/score-resources/{scoreResourceId}/sync-points:
+    get:
+      tags: [Practice]
+      operationId: listScoreSyncPoints
+      summary: 악보와 공통 Timeline의 Sync Point 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: scoreResourceId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 시간순 Sync Point 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ScoreSyncPoint' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Practice]
+      operationId: createScoreSyncPoint
+      summary: 악보 Sync Point 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: scoreResourceId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, timeMs]
+              properties:
+                page: { type: integer, minimum: 1 }
+                timeMs: { type: integer, minimum: 0 }
+                sectionLabel: { type: string, maxLength: 80 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScoreSyncPoint' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/score-resources/{scoreResourceId}/sync-points/{syncPointId}:
+    patch:
+      tags: [Practice]
+      operationId: updateScoreSyncPoint
+      summary: 악보 Sync Point 수정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: scoreResourceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: syncPointId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                page: { type: integer, minimum: 1 }
+                timeMs: { type: integer, minimum: 0 }
+                sectionLabel: { type: string, maxLength: 80 }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScoreSyncPoint' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [Practice]
+      operationId: deleteScoreSyncPoint
+      summary: 악보 Sync Point 삭제
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: scoreResourceId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: syncPointId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: 삭제됨 }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/stem-jobs:
+    post:
+      tags: [Practice]
+      operationId: createStemJob
+      summary: 4-Stem 분리 Job 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceResourceId]
+              properties:
+                sourceResourceId: { type: string }
+                configuration:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    quality:
+                      type: string
+                      enum: [STANDARD, HIGH]
+      responses:
+        '202':
+          description: Job 접수됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StemJob' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/stem-jobs/{jobId}:
+    get:
+      tags: [Practice]
+      operationId: getStemJob
+      summary: Stem Job 상태 조회
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job 상태
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StemJob' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/practice-takes:
+    get:
+      tags: [Practice]
+      operationId: listPracticeTakes
+      summary: 접근 가능한 Practice Take 목록
+      description: 내 Private Take와 Workspace에 게시된 Take만 반환한다.
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+      responses:
+        '200':
+          description: Take 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/PracticeTake' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/practice-take-upload-sessions:
+    post:
+      tags: [Practice, Uploads]
+      operationId: createPracticeTakeUploadSession
+      summary: Practice Take 직접 업로드 세션 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, part, baseTimelineSourceId, fileName, contentType, byteSize, sha256]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                part: { $ref: '#/components/schemas/MemberPart' }
+                baseTimelineSourceId: { type: string }
+                offsetMs: { type: integer, minimum: -60000, maximum: 60000, default: 0 }
+                fileName: { type: string, minLength: 1, maxLength: 255 }
+                contentType: { type: string, minLength: 1, maxLength: 200 }
+                byteSize: { type: integer, minimum: 1 }
+                sha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+      responses:
+        '201':
+          description: 업로드 세션
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadSession' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/practice-take-upload-sessions/{uploadSessionId}/complete:
+    post:
+      tags: [Practice, Uploads]
+      operationId: completePracticeTakeUpload
+      summary: 업로드 검증 및 Private Practice Take 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: uploadSessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: 생성된 Private Take
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeTake' }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/songs/{songId}/practice-takes/{takeId}:
+    patch:
+      tags: [Practice]
+      operationId: updatePracticeTake
+      summary: 내 Take 메타데이터와 공개 상태 수정
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: takeId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 200 }
+                offsetMs: { type: integer, minimum: -60000, maximum: 60000 }
+                visibility: { $ref: '#/components/schemas/TakeVisibility' }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PracticeTake' }
+        default: { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [Practice]
+      operationId: deletePracticeTake
+      summary: 내 Take 삭제
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/SongId'
+        - name: takeId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: 삭제됨 }
+        default: { $ref: '#/components/responses/Problem' }
+
+  /workspaces/{workspaceId}/rehearsals:
+    get:
+      tags: [Rehearsals]
+      operationId: listRehearsals
+      summary: 합주 Session 목록
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 합주 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RehearsalPage' }
+        default: { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [Rehearsals]
+      operationId: createRehearsal
+      summary: 합주 Session 생성
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, startsAt]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+                location: { type: string, maxLength: 300 }
+                songIds:
+                  type: array
+                  uniqueItems: true
+                  items: { type: string }
+                attendeeMemberIds:
+                  type: array
+                  uniqueItems: true
+                  items: { type: string }
+                notes: { type: string, maxLength: 10000 }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Rehearsal' }
+        default: { $ref: '#/components/responses/Problem' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    WorkspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema: { type: string }
+    RecommendationId:
+      name: recommendationId
+      in: path
+      required: true
+      schema: { type: string }
+    SongId:
+      name: songId
+      in: path
+      required: true
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 200 }
+
+  responses:
+    Problem:
+      description: Problem Details 오류
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    User:
+      type: object
+      required: [id, displayName, createdAt]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        avatarUrl: { type: string, format: uri }
+        createdAt: { type: string, format: date-time }
+
+    WorkspaceRole:
+      type: string
+      enum: [OWNER, MEMBER]
+    MemberPart:
+      type: string
+      enum: [VOCAL, GUITAR, BASS, DRUMS, KEYBOARD, OTHER]
+    PreparationStatus:
+      type: string
+      enum: [NOT_READY, PRACTICING, READY]
+    RecommendationStatus:
+      type: string
+      enum: [RECOMMENDED, CANDIDATE, ADOPTED, HOLD]
+    OpinionType:
+      type: string
+      enum: [IDEA, FIX, DISCUSSION, DECISION_CANDIDATE]
+    TakeVisibility:
+      type: string
+      enum: [PRIVATE, WORKSPACE]
+    ResourceType:
+      type: string
+      enum: [AUDIO_SOURCE, SCORE, REFERENCE]
+    UploadResourceType:
+      type: string
+      enum: [AUDIO_SOURCE, SCORE]
+    ProcessingStatus:
+      type: string
+      enum: [UPLOADING, UPLOADED, QUEUED, PROCESSING, PREPARING_AUDIO, COMPLETED, FAILED]
+
+    Workspace:
+      type: object
+      required: [id, name, memberCount, myRole, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        memberCount: { type: integer, minimum: 1 }
+        myRole: { $ref: '#/components/schemas/WorkspaceRole' }
+        createdAt: { type: string, format: date-time }
+
+    WorkspaceMember:
+      type: object
+      required: [id, user, role, parts, joinedAt]
+      properties:
+        id: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+        role: { $ref: '#/components/schemas/WorkspaceRole' }
+        parts:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/MemberPart' }
+        joinedAt: { type: string, format: date-time }
+
+    WorkspaceOverview:
+      type: object
+      required: [workspace, readySongs, recentActivities]
+      properties:
+        workspace: { $ref: '#/components/schemas/Workspace' }
+        nextRehearsal: { $ref: '#/components/schemas/Rehearsal' }
+        readySongs:
+          type: array
+          items: { $ref: '#/components/schemas/Song' }
+        adoptionCandidate: { $ref: '#/components/schemas/Recommendation' }
+        recentActivities:
+          type: array
+          items: { $ref: '#/components/schemas/Activity' }
+
+    Activity:
+      type: object
+      required: [id, actor, type, message, occurredAt]
+      properties:
+        id: { type: string }
+        actor: { $ref: '#/components/schemas/User' }
+        type: { type: string }
+        message: { type: string }
+        occurredAt: { type: string, format: date-time }
+
+    CreateRecommendationRequest:
+      type: object
+      required: [title, artist, reason]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        artist: { type: string, minLength: 1, maxLength: 200 }
+        reason: { type: string, minLength: 1, maxLength: 5000 }
+        releaseYear: { type: integer, minimum: 1000, maximum: 9999 }
+        referenceUrl: { type: string, format: uri }
+
+    RecommendationReactionSummary:
+      type: object
+      required: [likeCount, adoptionVoteCount, likedByMe, adoptionVotedByMe]
+      properties:
+        likeCount: { type: integer, minimum: 0 }
+        adoptionVoteCount: { type: integer, minimum: 0 }
+        likedByMe: { type: boolean }
+        adoptionVotedByMe: { type: boolean }
+
+    Recommendation:
+      type: object
+      required: [id, title, artist, reason, status, author, reactions, commentCount, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        reason: { type: string }
+        releaseYear: { type: integer }
+        referenceUrl: { type: string, format: uri }
+        thumbnailUrl: { type: string, format: uri }
+        status: { $ref: '#/components/schemas/RecommendationStatus' }
+        author: { $ref: '#/components/schemas/User' }
+        reactions: { $ref: '#/components/schemas/RecommendationReactionSummary' }
+        commentCount: { type: integer, minimum: 0 }
+        adoptedSongId: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    RecommendationPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Recommendation' }
+        nextCursor: { type: string }
+
+    Comment:
+      type: object
+      required: [id, author, content, createdAt]
+      properties:
+        id: { type: string }
+        author: { $ref: '#/components/schemas/User' }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CommentPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Comment' }
+        nextCursor: { type: string }
+
+    SongPart:
+      type: object
+      required: [id, part, displayName, member, preparationStatus]
+      properties:
+        id: { type: string }
+        part: { $ref: '#/components/schemas/MemberPart' }
+        displayName: { type: string }
+        member: { $ref: '#/components/schemas/WorkspaceMember' }
+        preparationStatus: { $ref: '#/components/schemas/PreparationStatus' }
+
+    Song:
+      type: object
+      required: [id, title, artist, parts, activeDecisions, checklist, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        recommendationId: { type: string }
+        title: { type: string }
+        artist: { type: string }
+        key: { type: string }
+        bpm: { type: integer }
+        coverImageUrl: { type: string, format: uri }
+        parts:
+          type: array
+          items: { $ref: '#/components/schemas/SongPart' }
+        activeDecisions:
+          type: array
+          items: { $ref: '#/components/schemas/Decision' }
+        checklist:
+          type: array
+          items: { $ref: '#/components/schemas/ChecklistItem' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SongPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Song' }
+        nextCursor: { type: string }
+
+    Opinion:
+      type: object
+      required: [id, type, author, content, createdAt]
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/OpinionType' }
+        author: { $ref: '#/components/schemas/User' }
+        content: { type: string }
+        parentId: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    OpinionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Opinion' }
+        nextCursor: { type: string }
+
+    Decision:
+      type: object
+      required: [id, content, active, author, createdAt]
+      properties:
+        id: { type: string }
+        content: { type: string }
+        active: { type: boolean }
+        author: { $ref: '#/components/schemas/User' }
+        sourceOpinionId: { type: string }
+        sourceTimelineCommentId: { type: string }
+        supersedesDecisionId: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    ChecklistItem:
+      type: object
+      required: [id, content, completed, createdAt]
+      properties:
+        id: { type: string }
+        content: { type: string }
+        completed: { type: boolean }
+        sourceDecisionId: { type: string }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+
+    BooleanStateRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+
+    CreateUploadSessionRequest:
+      type: object
+      required: [resourceType, fileName, contentType, byteSize, sha256]
+      properties:
+        resourceType: { $ref: '#/components/schemas/UploadResourceType' }
+        fileName: { type: string, minLength: 1, maxLength: 255 }
+        contentType: { type: string, minLength: 1, maxLength: 200 }
+        byteSize: { type: integer, minimum: 1 }
+        sha256:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+        part: { $ref: '#/components/schemas/MemberPart' }
+        description: { type: string, maxLength: 2000 }
+
+    UploadSession:
+      type: object
+      required: [id, uploadUrl, method, headers, expiresAt]
+      properties:
+        id: { type: string }
+        uploadUrl: { type: string, format: uri }
+        method:
+          type: string
+          enum: [PUT]
+        headers:
+          type: object
+          additionalProperties: { type: string }
+        expiresAt: { type: string, format: date-time }
+
+    SongResource:
+      type: object
+      required: [id, type, name, createdBy, createdAt]
+      properties:
+        id: { type: string }
+        type: { $ref: '#/components/schemas/ResourceType' }
+        name: { type: string }
+        description: { type: string }
+        part: { $ref: '#/components/schemas/MemberPart' }
+        contentType: { type: string }
+        byteSize: { type: integer }
+        downloadUrl: { type: string, format: uri }
+        externalUrl: { type: string, format: uri }
+        processingStatus: { $ref: '#/components/schemas/ProcessingStatus' }
+        timelineSourceId: { type: string }
+        createdBy: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time }
+
+    TimelineComment:
+      type: object
+      required: [id, timelineSourceId, startTimeMs, content, author, createdAt]
+      properties:
+        id: { type: string }
+        timelineSourceId: { type: string }
+        startTimeMs: { type: integer, minimum: 0 }
+        endTimeMs: { type: integer, minimum: 0 }
+        label: { type: string }
+        content: { type: string }
+        author: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time }
+
+    ScoreSyncPoint:
+      type: object
+      required: [id, scoreResourceId, page, timeMs, createdBy, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        scoreResourceId: { type: string }
+        page: { type: integer, minimum: 1 }
+        timeMs: { type: integer, minimum: 0 }
+        sectionLabel: { type: string }
+        createdBy: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Stem:
+      type: object
+      required: [id, kind, timelineSourceId, durationMs]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum: [VOCALS, DRUMS, BASS, OTHER]
+        timelineSourceId: { type: string }
+        durationMs: { type: integer, minimum: 0 }
+        playbackUrl: { type: string, format: uri }
+
+    StemJob:
+      type: object
+      required: [id, sourceResourceId, status, progress, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        sourceResourceId: { type: string }
+        status: { $ref: '#/components/schemas/ProcessingStatus' }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        stems:
+          type: array
+          items: { $ref: '#/components/schemas/Stem' }
+        failureCode: { type: string }
+        failureMessage: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    PracticeTake:
+      type: object
+      required: [id, name, author, part, baseTimelineSourceId, offsetMs, visibility, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        author: { $ref: '#/components/schemas/User' }
+        part: { $ref: '#/components/schemas/MemberPart' }
+        baseTimelineSourceId: { type: string }
+        timelineSourceId: { type: string }
+        offsetMs: { type: integer }
+        visibility: { $ref: '#/components/schemas/TakeVisibility' }
+        durationMs: { type: integer, minimum: 0 }
+        playbackUrl: { type: string, format: uri }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Rehearsal:
+      type: object
+      required: [id, title, startsAt, songs, attendees, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        location: { type: string }
+        songs:
+          type: array
+          items: { $ref: '#/components/schemas/Song' }
+        attendees:
+          type: array
+          items: { $ref: '#/components/schemas/WorkspaceMember' }
+        notes: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    RehearsalPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Rehearsal' }
+        nextCursor: { type: string }
+
+    FieldError:
+      type: object
+      required: [field, reason, message]
+      properties:
+        field: { type: string }
+        reason: { type: string }
+        message: { type: string }
+
+    Problem:
+      type: object
+      required: [type, title, status, code, traceId]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        code: { type: string }
+        traceId: { type: string }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }

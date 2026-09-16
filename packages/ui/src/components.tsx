@@ -1,6 +1,6 @@
 import styled from '@emotion/native';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { Pressable, type PressableProps } from 'react-native';
+import { Pressable, type PressableProps, View, type ViewProps } from 'react-native';
 import { theme } from './theme';
 
 export const Screen = styled.SafeAreaView`
@@ -12,24 +12,37 @@ export const ScrollContent = styled.ScrollView`
   flex: 1;
 `;
 
-export const Row = styled.View<{ gap?: number; wrap?: boolean }>`
-  flex-direction: row;
-  align-items: center;
-  gap: ${({ gap = 8 }) => gap}px;
-  flex-wrap: ${({ wrap }) => (wrap ? 'wrap' : 'nowrap')};
-`;
+export function Row({
+  gap = 8,
+  wrap,
+  style,
+  ...props
+}: ViewProps & { gap?: number; wrap?: boolean }) {
+  return (
+    <View
+      {...props}
+      style={[
+        { flexDirection: 'row', alignItems: 'center', gap, flexWrap: wrap ? 'wrap' : 'nowrap' },
+        style,
+      ]}
+    />
+  );
+}
 
-export const Stack = styled.View<{ gap?: number }>`
-  gap: ${({ gap = 8 }) => gap}px;
-`;
+export function Stack({ gap = 8, style, ...props }: ViewProps & { gap?: number }) {
+  return <View {...props} style={[{ gap }, style]} />;
+}
 
-export const Card = styled.View`
+const CardBase = styled.View`
   padding: 18px;
-  gap: 14px;
   border: 1px solid ${theme.colors.border};
   border-radius: ${theme.radius.md}px;
   background-color: ${theme.colors.surface};
 `;
+
+export function Card({ style, ...props }: ViewProps) {
+  return <CardBase {...props} style={[{ gap: 14 }, style]} />;
+}
 
 export const Title = styled.Text`
   color: ${theme.colors.text};
@@ -61,6 +74,7 @@ const ButtonSurface = styled(Pressable)<{ secondary?: boolean }>`
   border-radius: ${theme.radius.pill}px;
   background-color: ${({ secondary }) =>
     secondary ? theme.colors.surfaceRaised : theme.colors.primary};
+  opacity: ${({ disabled }) => (disabled ? 0.45 : 1)};
 `;
 
 const ButtonLabel = styled.Text<{ secondary?: boolean }>`

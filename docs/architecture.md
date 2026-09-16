@@ -28,6 +28,30 @@ docs/        제품·도메인·기술 기준 문서
 - 브라우저 URL, 파일 선택, 오디오 엔진 등 플랫폼 API만 `apps/*` 또는 `.web/.native` 파일에 둔다.
 - `packages/domain`은 React와 네트워크 라이브러리에 의존하지 않는다.
 
+## 오디오·악보 경계
+
+- `packages/app`은 Player, Mixer, 악보 Viewer, Take 목록의 공통 상태와 화면 조합을 가진다.
+- 실제 재생·녹음·마이크 권한·파일 선택은 `AudioEngine`과 `RecordingEngine` 인터페이스 뒤에서
+  `.web/.native` 구현으로 분리한다.
+- 공통 Player 상태는 `timelineSourceId`, `timeMs`, `durationMs`, `playbackRate`, `loopRange`를
+  기준으로 하며 악보, Waveform, Comment, Take가 같은 시각을 구독한다.
+- 악보 렌더러는 페이지 표시와 Sync Point 탐색만 담당하고 오디오 재생 상태를 직접 소유하지 않는다.
+- Stem 분리는 비동기 서버 Job이다. 클라이언트는 TanStack Query로 진행 상태를 polling하고 완료 후
+  Source 목록을 무효화한다.
+- 대용량 음원과 녹음 파일은 화면 state에 보관하지 않고 업로드 세션과 서버 메타데이터로 관리한다.
+
+## 개인 작업실 경계
+
+- 개인 작업실 Query key에는 `userId + personalProjectId`를 포함하고 Workspace 캐시와 분리한다.
+- 내 악기 추출은 서버 Job으로 처리한다. 클라이언트는 저용량 Preview와 Waveform, 악기별 우세도,
+  Clipping·Noise·Bleed 품질 지표를 받는다.
+- 자동 감지 결과보다 사용자가 선택한 Target Instrument를 우선하며, 재처리는 원본 Object를 재사용한다.
+- 악보 편집 UI는 `packages/app`에 두되, Canvas 입력·인쇄·파일 내보내기 구현은 `.web/.native` 경계로
+  분리한다.
+- 구조화 악보 Document는 화면 컴포넌트가 직접 변경하지 않고 Command와 Revision 계층을 거친다.
+- 기준 음원 재생은 공통 `AudioEngine`을 재사용하고 Score Cursor가 같은 `timeMs`를 구독한다.
+- Workspace 복사는 개인 프로젝트를 연결하는 동기화가 아니라 새 Resource를 만드는 API 명령이다.
+
 ## 상태 구분
 
 - 서버 상태: TanStack Query

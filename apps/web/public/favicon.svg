@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">파란 배경의 모아잼 로고</title>
+  <desc id="desc">파란 배경 위에 세 개의 원이 둥근 삼각형으로 연결되고 위쪽 원이 음표가 되는 로고</desc>
+  <defs>
+    <linearGradient id="background" x1="36" y1="24" x2="476" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B7CF2" />
+      <stop offset="1" stop-color="#2563EB" />
+    </linearGradient>
+    <linearGradient id="leftLight" x1="100" y1="190" x2="248" y2="418" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" />
+      <stop offset="1" stop-color="#F6F8FF" />
+    </linearGradient>
+    <linearGradient id="rightLight" x1="412" y1="190" x2="264" y2="418" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DCE5FF" />
+      <stop offset="1" stop-color="#C9D7FF" />
+    </linearGradient>
+    <linearGradient id="coral" x1="218" y1="92" x2="302" y2="226" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8979" />
+      <stop offset="1" stop-color="#FF6F5E" />
+    </linearGradient>
+    <clipPath id="leftHalf"><rect width="256" height="512" /></clipPath>
+    <clipPath id="rightHalf"><rect x="256" width="256" height="512" /></clipPath>
+    <mask id="roundOpening">
+      <rect width="512" height="512" fill="white" />
+      <circle cx="256" cy="305" r="82" fill="black" />
+    </mask>
+    <path id="body" d="M256 154C226 190 180 241 140 294C112 308 96 331 87 356C110 397 176 425 256 425C336 425 402 397 425 356C416 331 400 308 372 294C332 241 286 190 256 154Z" />
+  </defs>
+
+  <rect width="512" height="512" rx="92" fill="url(#background)" />
+  <g mask="url(#roundOpening)">
+    <use href="#body" fill="url(#leftLight)" clip-path="url(#leftHalf)" />
+    <use href="#body" fill="url(#rightLight)" clip-path="url(#rightHalf)" />
+  </g>
+  <circle cx="145" cy="354" r="62" fill="url(#leftLight)" />
+  <circle cx="367" cy="354" r="62" fill="url(#rightLight)" />
+
+  <path d="M304 169V83C304 74 313 69 320 74C346 92 379 102 397 125C407 138 411 154 408 169C407 178 397 181 391 174C378 158 353 154 326 139V169H304Z" fill="url(#coral)" />
+  <circle cx="256" cy="169" r="65" fill="url(#coral)" />
+</svg>

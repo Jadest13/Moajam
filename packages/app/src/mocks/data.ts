@@ -1,6 +1,22 @@
 import type { PreparationStatus } from '@moajam/domain';
+import { songMedia } from '../lib/songMedia';
 
-export const recommendations = [
+export interface RecommendationItem {
+  id: string;
+  title: string;
+  artist: string;
+  reason: string;
+  likes: number;
+  votes: number;
+  comments: number;
+  tint: string;
+  year: number;
+  recommendedAt: string;
+  thumbnailUrl?: string;
+  referenceUrl?: string;
+}
+
+export const recommendations: RecommendationItem[] = [
   {
     id: 'creep',
     title: 'Creep',
@@ -11,6 +27,9 @@ export const recommendations = [
     comments: 12,
     tint: '#e86545',
     year: 1993,
+    recommendedAt: '2024-09-10T13:20:00+09:00',
+    thumbnailUrl: songMedia.creep.thumbnailUrl,
+    referenceUrl: songMedia.creep.youtubeUrl,
   },
   {
     id: 'dont-look-back',
@@ -22,6 +41,9 @@ export const recommendations = [
     comments: 7,
     tint: '#9c8357',
     year: 1995,
+    recommendedAt: '2024-09-09T20:15:00+09:00',
+    thumbnailUrl: songMedia['dont-look-back'].thumbnailUrl,
+    referenceUrl: songMedia['dont-look-back'].youtubeUrl,
   },
   {
     id: 'teen-spirit',
@@ -33,6 +55,9 @@ export const recommendations = [
     comments: 10,
     tint: '#198fbd',
     year: 1991,
+    recommendedAt: '2024-09-08T18:40:00+09:00',
+    thumbnailUrl: songMedia['teen-spirit'].thumbnailUrl,
+    referenceUrl: songMedia['teen-spirit'].youtubeUrl,
   },
   {
     id: 'i-wanna-be-yours',
@@ -44,6 +69,7 @@ export const recommendations = [
     comments: 3,
     tint: '#303845',
     year: 2013,
+    recommendedAt: '2024-09-07T22:05:00+09:00',
   },
 ];
 

@@ -1,7 +1,7 @@
 import { AppProviders, AppScreen, type AppRoute } from '@moajam/app';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import './styles.css';
 
 const routePaths: Record<AppRoute, string> = {
@@ -13,11 +13,33 @@ const routePaths: Record<AppRoute, string> = {
   practice: '/workspaces/ws-demo/songs/creep/practice',
   rehearsals: '/workspaces/ws-demo/rehearsals',
   members: '/workspaces/ws-demo/members',
+  instrument: '/me/instrument-extractor',
+  'score-editor': '/me/score-editor',
+  settings: '/settings',
+  help: '/help',
 };
 
 function RoutedScreen({ route }: { route: AppRoute }) {
   const navigate = useNavigate();
-  return <AppScreen route={route} navigate={(nextRoute) => navigate(routePaths[nextRoute])} />;
+  const params = useParams();
+  const entityId = params.recommendationId ?? params.songId;
+  return (
+    <AppScreen
+      route={route}
+      entityId={entityId}
+      navigate={(nextRoute, options) => {
+        const basePath = routePaths[nextRoute];
+        const nextPath = options?.id
+          ? nextRoute === 'recommendation'
+            ? `/workspaces/ws-demo/recommendations/${options.id}`
+            : nextRoute === 'song'
+              ? `/workspaces/ws-demo/songs/${options.id}`
+              : basePath
+          : basePath;
+        navigate(nextPath);
+      }}
+    />
+  );
 }
 
 function WebApp() {
@@ -51,6 +73,10 @@ function WebApp() {
             path="/workspaces/:workspaceId/members"
             element={<RoutedScreen route="members" />}
           />
+          <Route path="/me/instrument-extractor" element={<RoutedScreen route="instrument" />} />
+          <Route path="/me/score-editor" element={<RoutedScreen route="score-editor" />} />
+          <Route path="/settings" element={<RoutedScreen route="settings" />} />
+          <Route path="/help" element={<RoutedScreen route="help" />} />
           <Route path="*" element={<Navigate to="/workspaces/ws-demo" replace />} />
         </Routes>
       </BrowserRouter>

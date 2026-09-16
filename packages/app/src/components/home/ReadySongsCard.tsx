@@ -1,8 +1,5 @@
 import { Muted } from '@moajam/ui';
-import { type ImageSourcePropType, useWindowDimensions, View } from 'react-native';
-import creepCover from '../../assets/creep-cover.png';
-import nirvanaCover from '../../assets/nirvana-cover.png';
-import oasisCover from '../../assets/oasis-cover.png';
+import { useWindowDimensions, View } from 'react-native';
 import { adoptedSongs } from '../../mocks/data';
 import type { AppRoute } from '../../navigation';
 import { ArtworkImage, Between, LinkText, SectionTitle } from '../../styles/layout';
@@ -24,8 +21,6 @@ const readiness = [
 ];
 
 const homeSongs = [adoptedSongs[1], adoptedSongs[0], adoptedSongs[2]];
-const covers = [oasisCover, creepCover, nirvanaCover] as ImageSourcePropType[];
-
 export function ReadySongsCard({ navigate }: { navigate: (route: AppRoute) => void }) {
   const { width } = useWindowDimensions();
 
@@ -39,7 +34,7 @@ export function ReadySongsCard({ navigate }: { navigate: (route: AppRoute) => vo
         {homeSongs.map((song, index) => (
           <SongRow key={song.id} onPress={() => navigate('song')}>
             <ArtworkImage
-              source={covers[index]}
+              source={song.thumbnailUrl ? { uri: song.thumbnailUrl } : undefined}
               resizeMode="cover"
               style={{ width: 48, height: 48 }}
             />

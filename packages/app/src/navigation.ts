@@ -6,8 +6,13 @@ export type AppRoute =
   | 'song'
   | 'practice'
   | 'rehearsals'
-  | 'members';
+  | 'members'
+  | 'instrument'
+  | 'score-editor'
+  | 'settings'
+  | 'help';
 
 export interface ScreenProps {
-  navigate: (route: AppRoute) => void;
+  navigate: (route: AppRoute, options?: { id?: string }) => void;
+  entityId?: string;
 }

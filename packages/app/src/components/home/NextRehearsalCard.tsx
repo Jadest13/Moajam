@@ -1,6 +1,6 @@
 import { Button, Muted } from '@moajam/ui';
 import { type ImageSourcePropType, useWindowDimensions, View } from 'react-native';
-import rehearsalRoom from '../../assets/rehearsal-room.png';
+import rehearsalRoom from '../../../assets/images/mock/rehearsal-room.png';
 import type { AppRoute } from '../../navigation';
 import { Between, Label, SectionTitle } from '../../styles/layout';
 import { CalendarTile, HomeCard, RehearsalImage, RehearsalSurface } from '../../styles/home';

@@ -3,6 +3,7 @@
     "name": "Moajam",
     "slug": "moajam",
     "version": "0.1.0",
+    "icon": "../../packages/app/assets/logo.png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,

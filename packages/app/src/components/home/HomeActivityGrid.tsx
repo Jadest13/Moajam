@@ -1,6 +1,6 @@
 import { Body, Button, Muted } from '@moajam/ui';
-import { type ImageSourcePropType, useWindowDimensions, View } from 'react-native';
-import nirvanaCover from '../../assets/nirvana-cover.png';
+import { useWindowDimensions, View } from 'react-native';
+import { songMedia } from '../../lib/songMedia';
 import type { AppRoute } from '../../navigation';
 import {
   ArtworkImage,
@@ -39,7 +39,11 @@ const activities = [
   },
 ];
 
-export function HomeActivityGrid({ navigate }: { navigate: (route: AppRoute) => void }) {
+export function HomeActivityGrid({
+  navigate,
+}: {
+  navigate: (route: AppRoute, options?: { id?: string }) => void;
+}) {
   const { width } = useWindowDimensions();
   const stacked = width < 760;
 
@@ -72,9 +76,9 @@ export function HomeActivityGrid({ navigate }: { navigate: (route: AppRoute) => 
           <SectionTitle>채택 후보</SectionTitle>
           <Muted>추천 급상승</Muted>
         </Between>
-        <CandidateSurface onPress={() => navigate('recommendation')}>
+        <CandidateSurface onPress={() => navigate('recommendation', { id: 'teen-spirit' })}>
           <ArtworkImage
-            source={nirvanaCover as ImageSourcePropType}
+            source={{ uri: songMedia['teen-spirit'].thumbnailUrl }}
             resizeMode="cover"
             style={{ width: 72, height: 72 }}
           />
@@ -93,7 +97,7 @@ export function HomeActivityGrid({ navigate }: { navigate: (route: AppRoute) => 
             </Inline>
           </View>
         </CandidateSurface>
-        <Button secondary onPress={() => navigate('recommendation')}>
+        <Button secondary onPress={() => navigate('recommendation', { id: 'teen-spirit' })}>
           후보 상세 보기
         </Button>
       </HomeCard>

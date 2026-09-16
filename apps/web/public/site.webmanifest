@@ -1,0 +1,17 @@
+{
+  "name": "Moajam | 함께 만드는 밴드 워크스페이스",
+  "short_name": "Moajam",
+  "description": "밴드와 합주팀을 위한 곡 중심 협업 공간",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fc",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/moajam-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

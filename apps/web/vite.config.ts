@@ -4,6 +4,15 @@ import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api/youtube-oembed': {
+        target: 'https://www.youtube.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/youtube-oembed/, '/oembed'),
+      },
+    },
+  },
   resolve: {
     alias: {
       'react-native': fileURLToPath(import.meta.resolve('react-native-web')),

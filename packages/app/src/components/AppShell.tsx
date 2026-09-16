@@ -1,10 +1,14 @@
 import styled from '@emotion/native';
-import { Row, Stack, theme } from '@moajam/ui';
+import { Stack, theme } from '@moajam/ui';
 import type { PropsWithChildren } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { Pressable, useWindowDimensions, View } from 'react-native';
+import moajamLogo from '../../assets/logo.png';
 import type { AppRoute } from '../navigation';
 import { Avatar, AvatarText, Main, PageScroll, Shell } from '../styles/layout';
+import { ComingSoonOverlay } from './ProductUI';
 import { AppIcon, type AppIconName } from './icons';
+
+const brandLogoSource = typeof moajamLogo === 'string' ? { uri: moajamLogo } : moajamLogo;
 
 const Sidebar = styled.View`
   width: 232px;
@@ -14,13 +18,16 @@ const Sidebar = styled.View`
   background-color: #101d35;
 `;
 
-const BrandMark = styled.View`
-  width: 38px;
-  height: 38px;
+const BrandMark = styled.Image`
+  width: 44px;
+  height: 44px;
+`;
+
+const BrandButton = styled.Pressable`
+  align-self: flex-start;
+  gap: 14px;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background-color: ${theme.colors.primary};
 `;
 
 const BrandName = styled.Text<{ dark?: boolean }>`
@@ -76,6 +83,13 @@ const NavLabel = styled.Text<{ active?: boolean }>`
   font-weight: ${({ active }) => (active ? 700 : 500)};
 `;
 
+const NavGroupLabel = styled.Text`
+  margin: 22px 12px 8px;
+  color: #72819a;
+  font-size: 11px;
+  font-weight: 800;
+`;
+
 const Profile = styled.View`
   padding: 12px 8px 0;
   gap: 10px;
@@ -124,6 +138,11 @@ const navItems: Array<{ icon: AppIconName; label: string; route: AppRoute }> = [
   { icon: 'users', label: '멤버', route: 'members' },
 ];
 
+const personalItems: Array<{ icon: AppIconName; label: string; route: AppRoute }> = [
+  { icon: 'sparkles', label: '내 악기 추출', route: 'instrument' },
+  { icon: 'songs', label: '악보 편집', route: 'score-editor' },
+];
+
 const activeGroup = (current: AppRoute, target: AppRoute) => {
   if (target === 'recommendations')
     return current === 'recommendations' || current === 'recommendation';
@@ -135,9 +154,17 @@ const activeGroup = (current: AppRoute, target: AppRoute) => {
 interface AppShellProps {
   activeRoute: AppRoute;
   onNavigate: (route: AppRoute) => void;
+  comingSoon?: string;
+  onComingSoonBack?: () => void;
 }
 
-export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildren<AppShellProps>) {
+export function AppShell({
+  children,
+  activeRoute,
+  onNavigate,
+  comingSoon,
+  onComingSoonBack,
+}: PropsWithChildren<AppShellProps>) {
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
   const compact = width < 620;
@@ -147,19 +174,24 @@ export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildre
       {desktop && (
         <Sidebar>
           <View>
-            <Row gap={10}>
-              <BrandMark>
-                <AppIcon name="logo" color="white" size={22} strokeWidth={2.2} />
-              </BrandMark>
+            <BrandButton
+              accessibilityRole="button"
+              accessibilityLabel="Moajam 홈으로 이동"
+              onPress={() => onNavigate('home')}
+              style={{ gap: 14 }}
+            >
+              <BrandMark source={brandLogoSource} resizeMode="contain" />
               <BrandName>Moajam</BrandName>
-            </Row>
-            <WorkspaceSwitcher>
+            </BrandButton>
+            <WorkspaceSwitcher style={{ gap: 10 }}>
               <WorkspaceThumb>
                 <AppIcon name="guitar" color="#713411" size={20} strokeWidth={2} />
               </WorkspaceThumb>
               <View style={{ flex: 1 }}>
                 <WhiteText>주말 합주단</WhiteText>
-                <WhiteText small>5명의 멤버</WhiteText>
+                <WhiteText small style={{ fontSize: 11, fontWeight: '500' }}>
+                  5명의 멤버
+                </WhiteText>
               </View>
               <AppIcon name="chevron-down" color="#aab6ca" size={16} />
             </WorkspaceSwitcher>
@@ -167,7 +199,31 @@ export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildre
               {navItems.map((item) => {
                 const active = activeGroup(activeRoute, item.route);
                 return (
-                  <NavItem key={item.route} active={active} onPress={() => onNavigate(item.route)}>
+                  <NavItem
+                    key={item.route}
+                    active={active}
+                    onPress={() => onNavigate(item.route)}
+                    style={{ gap: 12 }}
+                  >
+                    <NavIcon>
+                      <AppIcon name={item.icon} color={active ? 'white' : '#aab6ca'} size={18} />
+                    </NavIcon>
+                    <NavLabel active={active}>{item.label}</NavLabel>
+                  </NavItem>
+                );
+              })}
+            </Stack>
+            <NavGroupLabel>내 작업실</NavGroupLabel>
+            <Stack gap={4}>
+              {personalItems.map((item) => {
+                const active = activeGroup(activeRoute, item.route);
+                return (
+                  <NavItem
+                    key={item.route}
+                    active={active}
+                    onPress={() => onNavigate(item.route)}
+                    style={{ gap: 12 }}
+                  >
                     <NavIcon>
                       <AppIcon name={item.icon} color={active ? 'white' : '#aab6ca'} size={18} />
                     </NavIcon>
@@ -179,26 +235,44 @@ export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildre
           </View>
           <View>
             <Stack gap={4} style={{ marginBottom: 18 }}>
-              <NavItem>
+              <NavItem
+                active={activeRoute === 'settings'}
+                onPress={() => onNavigate('settings')}
+                style={{ gap: 12 }}
+              >
                 <NavIcon>
-                  <AppIcon name="settings" color="#aab6ca" size={18} />
+                  <AppIcon
+                    name="settings"
+                    color={activeRoute === 'settings' ? 'white' : '#aab6ca'}
+                    size={18}
+                  />
                 </NavIcon>
-                <NavLabel>설정</NavLabel>
+                <NavLabel active={activeRoute === 'settings'}>설정</NavLabel>
               </NavItem>
-              <NavItem>
+              <NavItem
+                active={activeRoute === 'help'}
+                onPress={() => onNavigate('help')}
+                style={{ gap: 12 }}
+              >
                 <NavIcon>
-                  <AppIcon name="help" color="#aab6ca" size={18} />
+                  <AppIcon
+                    name="help"
+                    color={activeRoute === 'help' ? 'white' : '#aab6ca'}
+                    size={18}
+                  />
                 </NavIcon>
-                <NavLabel>도움말</NavLabel>
+                <NavLabel active={activeRoute === 'help'}>도움말</NavLabel>
               </NavItem>
             </Stack>
-            <Profile>
+            <Profile style={{ gap: 10 }}>
               <Avatar color="#ffd8c8">
                 <AvatarText>민수</AvatarText>
               </Avatar>
               <View>
                 <WhiteText>김민수</WhiteText>
-                <WhiteText small>Guitar · Owner</WhiteText>
+                <WhiteText small style={{ fontSize: 11, fontWeight: '500' }}>
+                  Guitar · Owner
+                </WhiteText>
               </View>
             </Profile>
           </View>
@@ -207,15 +281,24 @@ export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildre
       <Main>
         {!desktop && (
           <MobileHeader>
-            <Row gap={9}>
-              <BrandMark>
-                <AppIcon name="logo" color="white" size={22} strokeWidth={2.2} />
-              </BrandMark>
+            <BrandButton
+              accessibilityRole="button"
+              accessibilityLabel="Moajam 홈으로 이동"
+              onPress={() => onNavigate('home')}
+              style={{ gap: 14 }}
+            >
+              <BrandMark source={brandLogoSource} resizeMode="contain" />
               <BrandName dark>Moajam</BrandName>
-            </Row>
-            <Avatar color="#ffd8c8">
-              <AvatarText>민수</AvatarText>
-            </Avatar>
+            </BrandButton>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="설정 열기"
+              onPress={() => onNavigate('settings')}
+            >
+              <Avatar color="#ffd8c8">
+                <AvatarText>민수</AvatarText>
+              </Avatar>
+            </Pressable>
           </MobileHeader>
         )}
         <PageScroll
@@ -229,12 +312,23 @@ export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildre
         >
           {children}
         </PageScroll>
+        {comingSoon ? (
+          <ComingSoonOverlay
+            label={comingSoon}
+            onBack={onComingSoonBack}
+            style={{ top: desktop ? 0 : 73, bottom: desktop ? 0 : 67 }}
+          />
+        ) : null}
         {!desktop && (
           <BottomNav>
             {navItems.map((item) => {
               const active = activeGroup(activeRoute, item.route);
               return (
-                <BottomItem key={item.route} onPress={() => onNavigate(item.route)}>
+                <BottomItem
+                  key={item.route}
+                  onPress={() => onNavigate(item.route)}
+                  style={{ gap: 3 }}
+                >
                   <AppIcon
                     name={item.icon}
                     color={active ? theme.colors.primary : theme.colors.textMuted}

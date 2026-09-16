@@ -7,5 +7,26 @@
 - [아키텍처](./architecture.md): 모노레포와 플랫폼 공유 전략
 - [개발 가이드](./development.md): 실행, 검사, 환경 변수, 코드 규칙
 - [MVP 로드맵](./roadmap.md): 구현 순서와 완료 기준
+- [상호작용 명세](./interaction-spec.md): 버튼·내비게이션 동작, 누락 기능, 구현 우선순위
+- [연습 미디어와 악보 동기화](./practice-media-spec.md): Stem, 개인 Take, 악보 동기 재생 기준
+- [개인 작업실](./personal-tools-spec.md): 내 악기 추출과 구조화 악보 편집 기준
+
+## 화면 시안
+
+- [홈](./home-dashboard-concept.png)
+- [곡 추천](./song-recommendations-concept.png)
+- [곡 추천 상세](./recommendation-detail-concept.png)
+- [채택곡](./adopted-songs-concept.png)
+- [채택곡 상세 Overview](./adopted-song-detail-concept.png)
+- [의견](./song-opinions-concept.png)
+- [자료](./song-resources-concept.png)
+- [연습](./song-practice-concept.png)
+- [합주 기록](./song-rehearsal-history-concept.png)
+- [합주](./rehearsals-concept.png)
+- [멤버](./members-concept.png)
+- [개인 내 악기 추출](./personal-instrument-extractor-concept.png)
+- [개인 악보 편집](./personal-score-editor-concept.png)
+- [설정](./settings-concept.png)
+- [도움말](./help-center-concept.png)
 
 기능을 추가하기 전에 제품 요구사항과 도메인 불변 조건을 먼저 갱신합니다.

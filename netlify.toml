@@ -5,3 +5,9 @@
 [build.environment]
   NODE_VERSION = "22"
   NPM_FLAGS = "--include=optional"
+
+[[redirects]]
+  from = "/api/youtube-oembed"
+  to = "https://www.youtube.com/oembed"
+  status = 200
+  force = true
