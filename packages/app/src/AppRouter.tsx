@@ -1,5 +1,9 @@
-import { useState } from 'react';
-import type { AppRoute } from './navigation';
+import { useEffect, useState } from 'react';
+import type { AppRoute, NavigationOptions } from './navigation';
+import { PersonalScreen } from './screens/PersonalScreen';
+import { WorkspaceScopeProvider, useMockAppState } from './state/MockAppState';
+import { AppShell } from './components/AppShell';
+import { ActionButton, Heading, Meta, Surface } from './components/ProductUI';
 import { HomeScreen } from './screens/HomeScreen';
 import { HelpScreen } from './screens/HelpScreen';
 import { InstrumentExtractorScreen } from './screens/InstrumentExtractorScreen';
@@ -15,12 +19,59 @@ import { SongWorkspaceScreen } from './screens/SongWorkspaceScreen';
 
 interface AppScreenProps {
   route: AppRoute;
-  navigate: (route: AppRoute, options?: { id?: string }) => void;
+  navigate: (route: AppRoute, options?: NavigationOptions) => void;
   entityId?: string;
+  workspaceId?: string;
 }
 
-export function AppScreen({ route, navigate, entityId }: AppScreenProps) {
+export function AppScreen(props: AppScreenProps) {
+  const { selectWorkspace, workspaces } = useMockAppState();
+  useEffect(() => {
+    if (props.workspaceId && workspaces.some((band) => band.id === props.workspaceId))
+      selectWorkspace(props.workspaceId);
+  }, [props.workspaceId, selectWorkspace, workspaces]);
+  return (
+    <WorkspaceScopeProvider id={props.workspaceId}>
+      <ScopedScreen
+        key={`${props.workspaceId ?? 'personal'}/${props.route}/${props.entityId ?? ''}`}
+        {...props}
+      />
+    </WorkspaceScopeProvider>
+  );
+}
+function ScopedScreen({ route, navigate, entityId, workspaceId }: AppScreenProps) {
+  const { workspaces, workspace } = useMockAppState();
+  if (workspaceId && !workspace)
+    return (
+      <AppShell activeRoute={route} onNavigate={navigate}>
+        <Surface>
+          <Heading>이 밴드에 접근할 수 없어요</Heading>
+          <Meta>참여 중인 밴드인지 확인해주세요.</Meta>
+          <ActionButton onPress={() => navigate('personal-home')}>개인 홈으로</ActionButton>
+        </Surface>
+      </AppShell>
+    );
+  if (
+    !workspaces.length &&
+    [
+      'home',
+      'recommendations',
+      'recommendation',
+      'songs',
+      'song',
+      'rehearsals',
+      'members',
+      'practice',
+    ].includes(route)
+  )
+    return <PersonalScreen route="personal-home" navigate={navigate} />;
   switch (route) {
+    case 'personal-home':
+    case 'personal-rehearsals':
+    case 'personal-songs':
+      return <PersonalScreen route={route} navigate={navigate} />;
+    case 'personal-practice':
+      return <PracticeScreen navigate={navigate} entityId={entityId} />;
     case 'recommendations':
       return <RecommendationsScreen navigate={navigate} />;
     case 'recommendation':
@@ -28,17 +79,17 @@ export function AppScreen({ route, navigate, entityId }: AppScreenProps) {
     case 'songs':
       return <SongsScreen navigate={navigate} />;
     case 'song':
-      return <SongWorkspaceScreen navigate={navigate} />;
+      return <SongWorkspaceScreen navigate={navigate} entityId={entityId} />;
     case 'practice':
-      return <PracticeScreen navigate={navigate} />;
+      return <PracticeScreen navigate={navigate} entityId={entityId} fromBand />;
     case 'rehearsals':
-      return <RehearsalsScreen navigate={navigate} />;
+      return <RehearsalsScreen navigate={navigate} entityId={entityId} />;
     case 'members':
       return <MembersScreen navigate={navigate} />;
     case 'instrument':
       return <InstrumentExtractorScreen navigate={navigate} />;
     case 'score-editor':
-      return <ScoreEditorScreen navigate={navigate} />;
+      return <ScoreEditorScreen navigate={navigate} entityId={entityId} />;
     case 'settings':
       return <SettingsScreen navigate={navigate} />;
     case 'help':
@@ -49,6 +100,24 @@ export function AppScreen({ route, navigate, entityId }: AppScreenProps) {
 }
 
 export function MoajamApp() {
-  const [route, setRoute] = useState<AppRoute>('home');
-  return <AppScreen route={route} navigate={setRoute} />;
+  const [location, setLocation] = useState<{ route: AppRoute; id?: string; workspaceId?: string }>({
+    route: 'personal-home',
+  });
+  const { selectedWorkspaceId } = useMockAppState();
+  return (
+    <AppScreen
+      route={location.route}
+      entityId={location.id}
+      workspaceId={location.workspaceId}
+      navigate={(route, options) =>
+        setLocation({
+          route,
+          id: options?.id,
+          workspaceId:
+            options?.workspaceId ??
+            (route.startsWith('personal-') ? undefined : selectedWorkspaceId),
+        })
+      }
+    />
+  );
 }

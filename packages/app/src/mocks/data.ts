@@ -2,6 +2,13 @@ import type { PreparationStatus } from '@moajam/domain';
 import { songMedia } from '../lib/songMedia';
 
 export interface RecommendationItem {
+  likedBy?: string[];
+  votedBy?: string[];
+  likedByMe?: boolean;
+  votedByMe?: boolean;
+  deferred?: boolean;
+  deferredReason?: string;
+  authorId?: string;
   id: string;
   title: string;
   artist: string;

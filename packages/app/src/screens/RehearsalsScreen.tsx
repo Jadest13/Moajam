@@ -1,5 +1,6 @@
 import { theme } from '@moajam/ui';
 import { useState, type ReactNode } from 'react';
+import { useIdentity } from '../state/Identity';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -10,10 +11,10 @@ import {
   View,
 } from 'react-native';
 import { AppShell } from '../components/AppShell';
+import { PracticeStudio } from '../components/PracticeStudio';
 import {
   ActionButton,
   CheckItem,
-  ComingSoonOverlay,
   Copy,
   Divider,
   FlexBetween,
@@ -30,12 +31,11 @@ import {
   ResponsiveGrid,
   Stack,
   Surface,
-  Waveform,
 } from '../components/ProductUI';
 import { AppIcon } from '../components/icons';
-import { initialChecklist } from '../mocks/data';
+import { dateKey } from '../mocks/workspaces';
 import type { ScreenProps } from '../navigation';
-import { useMockAppState } from '../state/MockAppState';
+import { useMockAppState, useWorkspaceValue } from '../state/MockAppState';
 import { Avatar, AvatarText, Input, Label } from '../styles/layout';
 
 type SessionDraft = {
@@ -46,42 +46,6 @@ type SessionDraft = {
   place: string;
   goal: string;
 };
-type HistorySession = {
-  date: string;
-  fullDate: string;
-  place: string;
-  info: string;
-  memo: string;
-  decisions: string[];
-};
-
-const initialSchedule: SessionDraft = {
-  title: '정기 합주',
-  date: '2024년 9월 12일 (토)',
-  start: '18:00',
-  end: '21:00',
-  place: '홍대 합주실 A룸',
-  goal: 'Creep 전체 합주와 엔딩 구간 맞추기',
-};
-const pastSessions: HistorySession[] = [
-  {
-    date: '9월 5일',
-    fullDate: '2024년 9월 5일 (목)',
-    place: '합정 합주실 B룸',
-    info: '3곡 · 녹음 52:10',
-    memo: 'Creep 템포를 낮춰 전체 구성을 맞췄어요. 2절 기타 진입을 다음 합주에서 다시 확인합니다.',
-    decisions: ['Key D 유지', 'Ending 2회 반복', '기타 솔로 톤 수정'],
-  },
-  {
-    date: '8월 29일',
-    fullDate: '2024년 8월 29일 (목)',
-    place: '홍대 합주실 A룸',
-    info: '4곡 · 녹음 01:08:24',
-    memo: '셋리스트 순서와 곡 사이 전환 시간을 점검했어요.',
-    decisions: ['Creep 오프닝 확정', '보컬 코러스 파트 추가', '다음 합주 18시 시작'],
-  },
-];
-
 function ModalFrame({
   visible,
   title,
@@ -187,43 +151,63 @@ function FormField({
   );
 }
 
-export function RehearsalsScreen({ navigate }: ScreenProps) {
+export function RehearsalsScreen({ navigate, entityId }: ScreenProps) {
+  const currentUserId = useIdentity();
   const { width } = useWindowDimensions();
-  const { members } = useMockAppState();
-  const [checks, setChecks] = useState(initialChecklist);
+  const {
+    members,
+    workspaceId,
+    rehearsals,
+    saveRehearsal,
+    canManage,
+    setDocument,
+    cancelRehearsal,
+    adoptedSongs,
+  } = useMockAppState();
+  const initialSchedule = entityId
+    ? rehearsals.find((event) => event.id === entityId)
+    : rehearsals
+        .filter((event) => !event.cancelled && new Date(`${event.date}T${event.end}`) >= new Date())
+        .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))[0];
+  const [selectedId, setSelectedId] = useState(initialSchedule?.id);
+  const schedule = rehearsals.find((event) => event.id === selectedId);
+  const [formError, setFormError] = useState('');
+  const blankSchedule: SessionDraft = {
+    title: '정기 합주',
+    date: dateKey(new Date()),
+    start: '18:00',
+    end: '21:00',
+    place: '',
+    goal: '',
+  };
+  const [checks, setChecks] = useWorkspaceValue<{ id: string; label: string; done: boolean }[]>(
+    `session/${selectedId}/checks`,
+    [],
+  );
   const [checkDraft, setCheckDraft] = useState('');
   const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
-  const [memo, setMemo] = useState(
-    '전체적으로 느린 템포로 시작.\n- Key D로 변경\n- Ending은 다 같이 맞춰보기',
-  );
+  const [memo, setMemo] = useWorkspaceValue(`session/${selectedId}/memo`, '');
   const [saved, setSaved] = useState(false);
-  const [schedule, setSchedule] = useState(initialSchedule);
-  const [draft, setDraft] = useState(initialSchedule);
+  const [draft, setDraft] = useState<SessionDraft>(initialSchedule ?? blankSchedule);
   const [modalMode, setModalMode] = useState<'new' | 'edit' | null>(null);
-  const [selectedMembers, setSelectedMembers] = useState(members.map((member) => member.id));
+  const [selectedMembers] = useWorkspaceValue<string[]>(`session/${selectedId}/members`, []);
   const [draftMembers, setDraftMembers] = useState(members.map((member) => member.id));
-  const [selectedHistory, setSelectedHistory] = useState<HistorySession | null>(null);
   const [isAssignmentOpen, setIsAssignmentOpen] = useState(false);
-  const [tasks, setTasks] = useState([
-    { id: 'task-1', label: 'Guitar Solo 수정', done: true, assigneeId: 'm1' },
-    { id: 'task-2', label: 'Vocal −1키 연습', done: false, assigneeId: 'm2' },
-    { id: 'task-3', label: '코러스 하모니 연습', done: false, assigneeId: '' },
-  ]);
+  const [tasks, setTasks] = useWorkspaceValue<
+    { id: string; label: string; done: boolean; assigneeId: string; due?: string }[]
+  >(`session/${selectedId}/tasks`, []);
+  const [taskDraft, setTaskDraft] = useState('');
   const completed = checks.filter((item) => item.done).length;
 
   const openNewSession = () => {
-    setDraft({
-      title: '정기 합주',
-      date: '2024년 9월 19일 (목)',
-      start: '19:00',
-      end: '22:00',
-      place: '',
-      goal: '',
-    });
+    setDraft(blankSchedule);
+    setFormError('');
     setDraftMembers(members.map((member) => member.id));
     setModalMode('new');
   };
   const openEditSchedule = () => {
+    if (!schedule) return;
+    setFormError('');
     setDraft(schedule);
     setDraftMembers(selectedMembers);
     setModalMode('edit');
@@ -231,10 +215,27 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
   const updateDraft = (key: keyof SessionDraft, value: string) =>
     setDraft((current) => ({ ...current, [key]: value }));
   const saveSchedule = () => {
-    if (!draft.date.trim() || !draft.place.trim()) return;
-    setSchedule(draft);
-    setSelectedMembers(draftMembers);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(draft.date) ||
+      Number.isNaN(new Date(`${draft.date}T00:00:00`).getTime()) ||
+      dateKey(new Date(`${draft.date}T00:00:00`)) !== draft.date ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.start) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.end) ||
+      draft.end <= draft.start ||
+      !draft.place.trim() ||
+      !draft.title.trim()
+    ) {
+      setFormError(
+        '날짜(YYYY-MM-DD), 시작·종료 시간(HH:MM), 이름과 장소를 확인해주세요. 종료 시간은 시작 시간 이후여야 해요.',
+      );
+      return;
+    }
+    const id = modalMode === 'edit' && schedule ? schedule.id : `session-${Date.now()}`;
+    saveRehearsal({ ...draft, id });
+    setSelectedId(id);
+    setDocument(`session/${id}/members`, draftMembers, []);
     setModalMode(null);
+    navigate('rehearsals', { id, workspaceId });
   };
   const addChecklistItem = () => {
     if (!checkDraft.trim()) return;
@@ -257,186 +258,271 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
             일정, 현장 체크리스트, 녹음과 다음 액션을 하나의 기록으로 남겨요.
           </PageDescription>
         </PageTop>
-        <ActionButton onPress={openNewSession}>+ 새 합주 세션</ActionButton>
+        <ActionButton disabled={!canManage} onPress={openNewSession}>
+          + 새 합주 세션
+        </ActionButton>
       </FlexBetween>
 
-      <Surface>
-        <FlexBetween style={width < 620 ? { alignItems: 'flex-start' } : undefined}>
-          <FlexRow style={{ flex: 1, alignItems: 'flex-start' }}>
-            <View
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 12,
-                backgroundColor: '#edf3ff',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <AppIcon name="calendar" color={theme.colors.primary} size={25} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Heading>{schedule.date}</Heading>
-              <Copy>
-                {schedule.start}–{schedule.end} · {schedule.place}
-              </Copy>
-              <Meta>
-                {schedule.title} · {schedule.goal || '합주 목표를 정해보세요'}
-              </Meta>
-            </View>
-          </FlexRow>
-          <ActionButton secondary compact={width < 620} onPress={openEditSchedule}>
-            일정 편집
-          </ActionButton>
-        </FlexBetween>
-        <Divider />
-        <FlexBetween>
-          <FlexRow>
-            {members
-              .filter((member) => selectedMembers.includes(member.id))
-              .map((member) => (
-                <Avatar key={member.id} color={member.color}>
-                  <AvatarText>{member.initials}</AvatarText>
-                </Avatar>
-              ))}
-          </FlexRow>
-          <Pill tone="green">
-            <PillText tone="green">{selectedMembers.length}명 참석</PillText>
+      <FlexRow wrap>
+        {rehearsals.map((event) => (
+          <Pill
+            key={event.id}
+            active={selectedId === event.id}
+            onPress={() => navigate('rehearsals', { id: event.id, workspaceId })}
+          >
+            <PillText active={selectedId === event.id}>
+              {event.cancelled ? '[취소] ' : ''}
+              {event.date} · {event.title}
+            </PillText>
           </Pill>
-        </FlexBetween>
-      </Surface>
-
-      <ResponsiveGrid stacked={width < 940}>
-        <Stack gap={16} style={width < 940 ? undefined : { flex: 1 }}>
+        ))}
+      </FlexRow>
+      {schedule ? (
+        <>
           <Surface>
-            <FlexBetween>
-              <Heading>오늘 확인할 것</Heading>
-              <Meta>
-                {completed} / {checks.length} 완료
-              </Meta>
-            </FlexBetween>
-            <Progress>
-              <ProgressValue value={(completed / checks.length) * 100} />
-            </Progress>
-            {checks.map((item) => (
-              <CheckItem
-                key={item.id}
-                checked={item.done}
-                label={item.label}
-                onPress={() =>
-                  setChecks((all) =>
-                    all.map((value) =>
-                      value.id === item.id ? { ...value, done: !value.done } : value,
-                    ),
-                  )
-                }
-              />
-            ))}
-            <ActionButton secondary onPress={() => setIsCheckModalOpen(true)}>
-              + 항목 추가
-            </ActionButton>
-          </Surface>
-          <View style={{ position: 'relative' }}>
-            <Surface>
-              <FlexBetween>
-                <Heading>합주 녹음</Heading>
-                <ActionButton compact>● 녹음 시작</ActionButton>
-              </FlexBetween>
-              <FlexRow>
+            <FlexBetween style={width < 620 ? { alignItems: 'flex-start' } : undefined}>
+              <FlexRow style={{ flex: 1, alignItems: 'flex-start' }}>
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: '#eef3ff',
+                    width: 52,
+                    height: 52,
+                    borderRadius: 12,
+                    backgroundColor: '#edf3ff',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Copy>▶</Copy>
+                  <AppIcon name="calendar" color={theme.colors.primary} size={25} />
                 </View>
-                <View>
-                  <Copy style={{ fontWeight: '900' }}>rehearsal_20240912.wav</Copy>
-                  <Meta>48:32 · 45MB</Meta>
+                <View style={{ flex: 1 }}>
+                  <Heading>{schedule.date}</Heading>
+                  <Copy>
+                    {schedule.start}–{schedule.end} · {schedule.place}
+                  </Copy>
+                  <Meta>
+                    {schedule.title} · {schedule.goal || '합주 목표를 정해보세요'}
+                  </Meta>
                 </View>
-                <Waveform height={36} />
               </FlexRow>
-            </Surface>
-            <ComingSoonOverlay compact label="합주 녹음은 추후 개발됩니다" />
-          </View>
-        </Stack>
-        <Stack gap={16} style={width < 940 ? undefined : { flex: 1 }}>
-          <Surface>
-            <FlexBetween>
-              <Heading>합주 메모</Heading>
-              <Meta>{saved ? '저장됨 ✓' : '자동 저장'}</Meta>
+              <ActionButton
+                secondary
+                compact={width < 620}
+                disabled={!canManage}
+                onPress={openEditSchedule}
+              >
+                일정 편집
+              </ActionButton>
             </FlexBetween>
-            <Input
-              value={memo}
-              onChangeText={(value) => {
-                setMemo(value);
-                setSaved(false);
-              }}
-              multiline
-              style={{ minHeight: 160, textAlignVertical: 'top' }}
-            />
-            <ActionButton onPress={() => setSaved(true)}>메모 저장</ActionButton>
-          </Surface>
-          <Surface>
-            <View style={{ gap: 3 }}>
-              <Heading>다음 합주까지</Heading>
-              <Meta>담당자는 각 할 일을 책임지고 준비하며, 변경 알림을 받는 멤버예요.</Meta>
-            </View>
-            {tasks.map((task) => {
-              const assignee = members.find((member) => member.id === task.assigneeId);
-              return (
-                <CheckItem
-                  key={task.id}
-                  checked={task.done}
-                  label={task.label}
-                  onPress={() =>
-                    setTasks((current) =>
-                      current.map((item) =>
-                        item.id === task.id ? { ...item, done: !item.done } : item,
-                      ),
-                    )
-                  }
-                  meta={
-                    <Pill tone={assignee ? undefined : 'amber'}>
-                      <PillText tone={assignee ? undefined : 'amber'}>
-                        {assignee?.name ?? '미지정'}
-                      </PillText>
-                    </Pill>
-                  }
-                />
-              );
-            })}
-            <ActionButton secondary onPress={() => setIsAssignmentOpen(true)}>
-              할 일 담당자 지정
-            </ActionButton>
-          </Surface>
-        </Stack>
-      </ResponsiveGrid>
-
-      <Heading>지난 합주</Heading>
-      {pastSessions.map((session) => (
-        <Surface key={session.fullDate}>
-          <FlexBetween>
-            <FlexRow>
-              <Pill>
-                <PillText>{session.date}</PillText>
-              </Pill>
-              <View>
-                <Copy style={{ fontWeight: '900' }}>{session.place}</Copy>
-                <Meta>{session.info}</Meta>
-              </View>
+            <FlexRow wrap>
+              {canManage ? (
+                <ActionButton secondary danger compact onPress={() => cancelRehearsal(schedule.id)}>
+                  {schedule.cancelled ? '일정 복원' : '일정 취소'}
+                </ActionButton>
+              ) : null}
+              <Meta>{schedule.cancelled ? '취소된 합주입니다.' : '합주할 곡을 선택하세요.'}</Meta>
+              {adoptedSongs.map((song) => (
+                <Pill
+                  key={song.id}
+                  active={schedule.songIds?.includes(song.id)}
+                  onPress={() => {
+                    if (canManage)
+                      saveRehearsal({
+                        ...schedule,
+                        songIds: schedule.songIds?.includes(song.id)
+                          ? schedule.songIds.filter((id) => id !== song.id)
+                          : [...(schedule.songIds ?? []), song.id],
+                      });
+                  }}
+                >
+                  <PillText>{song.title}</PillText>
+                </Pill>
+              ))}
             </FlexRow>
-            <ActionButton secondary compact onPress={() => setSelectedHistory(session)}>
-              기록 보기
-            </ActionButton>
-          </FlexBetween>
+            <Divider />
+            <FlexBetween>
+              <FlexRow>
+                {members
+                  .filter((member) => selectedMembers.includes(member.id))
+                  .map((member) => (
+                    <Avatar key={member.id} color={member.color}>
+                      <AvatarText>{member.initials}</AvatarText>
+                    </Avatar>
+                  ))}
+              </FlexRow>
+              <Pill tone="green">
+                <PillText tone="green">{selectedMembers.length}명 참석</PillText>
+              </Pill>
+              <ActionButton
+                secondary
+                compact
+                onPress={() =>
+                  setDocument(
+                    `session/${selectedId}/members`,
+                    selectedMembers.includes(currentUserId)
+                      ? selectedMembers.filter((id) => id !== currentUserId)
+                      : [...selectedMembers, currentUserId],
+                    [],
+                  )
+                }
+              >
+                {selectedMembers.includes(currentUserId) ? '참석 취소' : '참석하기'}
+              </ActionButton>
+            </FlexBetween>
+          </Surface>
+
+          <ResponsiveGrid stacked={width < 940}>
+            <Stack gap={16} style={width < 940 ? undefined : { flex: 1 }}>
+              <Surface>
+                <FlexBetween>
+                  <Heading>오늘 확인할 것</Heading>
+                  <Meta>
+                    {completed} / {checks.length} 완료
+                  </Meta>
+                </FlexBetween>
+                <Progress>
+                  <ProgressValue value={checks.length ? (completed / checks.length) * 100 : 0} />
+                </Progress>
+                {checks.map((item) => (
+                  <CheckItem
+                    key={item.id}
+                    checked={item.done}
+                    label={item.label}
+                    onPress={() =>
+                      setChecks((all) =>
+                        all.map((value) =>
+                          value.id === item.id ? { ...value, done: !value.done } : value,
+                        ),
+                      )
+                    }
+                  />
+                ))}
+                <ActionButton secondary onPress={() => setIsCheckModalOpen(true)}>
+                  + 항목 추가
+                </ActionButton>
+              </Surface>
+              <PracticeStudio
+                key={`session/${workspaceId}/${selectedId}`}
+                scopeKey={`session/${workspaceId}/${selectedId}`}
+              />
+            </Stack>
+            <Stack gap={16} style={width < 940 ? undefined : { flex: 1 }}>
+              <Surface>
+                <FlexBetween>
+                  <Heading>합주 메모</Heading>
+                  <Meta>{saved ? '저장됨' : '자동 저장'}</Meta>
+                </FlexBetween>
+                <Input
+                  value={memo}
+                  onChangeText={(value) => {
+                    setMemo(value);
+                    setSaved(false);
+                  }}
+                  multiline
+                  style={{ minHeight: 160, textAlignVertical: 'top' }}
+                />
+                <ActionButton onPress={() => setSaved(true)}>메모 저장</ActionButton>
+              </Surface>
+              <Surface>
+                <View style={{ gap: 3 }}>
+                  <Heading>다음 합주까지</Heading>
+                  <Meta>할 일의 담당자를 지정해요. 변경 알림은 아직 발송되지 않습니다.</Meta>
+                </View>
+                <Input
+                  value={taskDraft}
+                  onChangeText={setTaskDraft}
+                  placeholder="다음 합주까지 할 일"
+                />
+                <ActionButton
+                  secondary
+                  disabled={!taskDraft.trim()}
+                  onPress={() => {
+                    setTasks((all) => [
+                      ...all,
+                      {
+                        id: `task-${Date.now()}`,
+                        label: taskDraft.trim(),
+                        done: false,
+                        assigneeId: currentUserId,
+                      },
+                    ]);
+                    setTaskDraft('');
+                  }}
+                >
+                  할 일 추가
+                </ActionButton>
+                {tasks.map((task) => {
+                  const assignee = members.find((member) => member.id === task.assigneeId);
+                  return (
+                    <CheckItem
+                      key={task.id}
+                      checked={task.done}
+                      label={task.label}
+                      onPress={() =>
+                        setTasks((current) =>
+                          current.map((item) =>
+                            item.id === task.id ? { ...item, done: !item.done } : item,
+                          ),
+                        )
+                      }
+                      meta={
+                        <Pill tone={assignee ? undefined : 'amber'}>
+                          <PillText tone={assignee ? undefined : 'amber'}>
+                            {assignee?.name ?? '미지정'}
+                          </PillText>
+                        </Pill>
+                      }
+                    />
+                  );
+                })}
+                <ActionButton secondary onPress={() => setIsAssignmentOpen(true)}>
+                  할 일 담당자 지정
+                </ActionButton>
+              </Surface>
+            </Stack>
+          </ResponsiveGrid>
+        </>
+      ) : (
+        <Surface>
+          <Heading>{entityId ? '합주를 찾을 수 없어요' : '선택된 합주가 없어요'}</Heading>
+          <Meta>밴드의 합주 일정은 개인 공간의 캘린더에도 함께 표시됩니다.</Meta>
+          <ActionButton disabled={!canManage} onPress={openNewSession}>
+            + 합주 일정 만들기
+          </ActionButton>
         </Surface>
-      ))}
+      )}
+      <Heading>지난 합주</Heading>
+      {rehearsals
+        .filter((event) => !event.cancelled && new Date(`${event.date}T${event.end}`) < new Date())
+        .map((event) => ({
+          date: event.date,
+          fullDate: event.id,
+          place: event.place,
+          info: event.title,
+          memo: '',
+          decisions: [],
+        }))
+        .map((session) => (
+          <Surface key={session.fullDate}>
+            <FlexBetween>
+              <FlexRow>
+                <Pill>
+                  <PillText>{session.date}</PillText>
+                </Pill>
+                <View>
+                  <Copy style={{ fontWeight: '600' }}>{session.place}</Copy>
+                  <Meta>{session.info}</Meta>
+                </View>
+              </FlexRow>
+              <ActionButton
+                secondary
+                compact
+                onPress={() => navigate('rehearsals', { id: session.fullDate, workspaceId })}
+              >
+                기록 보기
+              </ActionButton>
+            </FlexBetween>
+          </Surface>
+        ))}
 
       <ModalFrame
         visible={modalMode !== null}
@@ -448,6 +534,11 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
         }
         onClose={() => setModalMode(null)}
       >
+        {formError ? (
+          <Copy accessibilityRole="alert" style={{ color: '#be3b4b' }}>
+            {formError}
+          </Copy>
+        ) : null}
         <FormField
           label="세션 이름"
           value={draft.title}
@@ -458,7 +549,7 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
           label="날짜"
           value={draft.date}
           onChangeText={(value) => updateDraft('date', value)}
-          placeholder="예: 2024년 9월 19일 (목)"
+          placeholder="YYYY-MM-DD"
         />
         <FlexRow style={{ alignItems: 'stretch' }}>
           <FormField
@@ -515,7 +606,7 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
                   <Avatar color={member.color} style={{ width: 28, height: 28 }}>
                     <AvatarText>{member.initials}</AvatarText>
                   </Avatar>
-                  <Copy style={{ fontWeight: '800' }}>{member.name}</Copy>
+                  <Copy style={{ fontWeight: '500' }}>{member.name}</Copy>
                 </Pressable>
               );
             })}
@@ -562,7 +653,7 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
       >
         {tasks.map((task) => (
           <Surface key={task.id} tint="#f8faff">
-            <Copy style={{ fontWeight: '900' }}>{task.label}</Copy>
+            <Copy style={{ fontWeight: '600' }}>{task.label}</Copy>
             <FlexRow wrap>
               {members.map((member) => {
                 const active = task.assigneeId === member.id;
@@ -598,54 +689,6 @@ export function RehearsalsScreen({ navigate }: ScreenProps) {
           </Surface>
         ))}
         <ActionButton onPress={() => setIsAssignmentOpen(false)}>지정 완료</ActionButton>
-      </ModalFrame>
-
-      <ModalFrame
-        visible={selectedHistory !== null}
-        title="지난 합주 기록"
-        description="그날의 결정과 다음 액션을 다시 확인할 수 있어요."
-        onClose={() => setSelectedHistory(null)}
-      >
-        {selectedHistory ? (
-          <>
-            <Surface tint="#f7f9ff">
-              <FlexRow>
-                <AppIcon name="calendar" color={theme.colors.primary} size={22} />
-                <View>
-                  <Heading>{selectedHistory.fullDate}</Heading>
-                  <Meta>
-                    {selectedHistory.place} · {selectedHistory.info}
-                  </Meta>
-                </View>
-              </FlexRow>
-            </Surface>
-            <View style={{ gap: 7 }}>
-              <Label>합주 요약</Label>
-              <Copy>{selectedHistory.memo}</Copy>
-            </View>
-            <View style={{ gap: 7 }}>
-              <Label>그날 정한 내용</Label>
-              {selectedHistory.decisions.map((decision) => (
-                <FlexRow key={decision}>
-                  <Copy style={{ color: '#16a36a', fontWeight: '900' }}>✓</Copy>
-                  <Copy>{decision}</Copy>
-                </FlexRow>
-              ))}
-            </View>
-            <Surface>
-              <FlexBetween>
-                <View>
-                  <Copy style={{ fontWeight: '900' }}>합주 녹음</Copy>
-                  <Meta>당일 전체 녹음</Meta>
-                </View>
-                <Pill>
-                  <PillText>{selectedHistory.info.split('· ')[1]}</PillText>
-                </Pill>
-              </FlexBetween>
-            </Surface>
-            <ActionButton onPress={() => setSelectedHistory(null)}>확인</ActionButton>
-          </>
-        ) : null}
       </ModalFrame>
     </AppShell>
   );

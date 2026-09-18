@@ -17,13 +17,13 @@ const Surface = styled.Pressable`
 const Title = styled.Text`
   color: ${theme.colors.text};
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 const Stat = styled.Text`
   color: ${theme.colors.textMuted};
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 interface SongCardProps {

@@ -1,6 +1,5 @@
-import { theme } from '@moajam/ui';
-import { Image, type ImageSourcePropType, useWindowDimensions, View } from 'react-native';
-import rehearsalRoom from '../../assets/images/mock/rehearsal-room.png';
+import { useIdentity } from '../state/Identity';
+import { useWindowDimensions, View } from 'react-native';
 import { AppShell } from '../components/AppShell';
 import {
   ActionButton,
@@ -17,228 +16,167 @@ import {
   Progress,
   ProgressValue,
   ResponsiveGrid,
-  Slider,
   SongCover,
   Stack,
   Surface,
 } from '../components/ProductUI';
-import { AppIcon } from '../components/icons';
+import { useMockAppState } from '../state/MockAppState';
 import type { ScreenProps } from '../navigation';
 import { Avatar, AvatarText } from '../styles/layout';
 
-const songs = [
-  { id: 'oasis', title: "Don't Look Back in Anger", artist: 'Oasis', ready: '2 / 5', value: 42 },
-  { id: 'creep', title: 'Creep', artist: 'Radiohead', ready: '3 / 5', value: 60 },
-  { id: 'nirvana', title: 'Smells Like Teen Spirit', artist: 'Nirvana', ready: '1 / 5', value: 20 },
-] as const;
-
-const activities = [
-  ['영희', '#fde4bc', '이영희', 'Creep 곡에 댓글을 남겼습니다.', '3시간 전'],
-  ['민수', '#ffd8c8', '김민수', '다음 합주 일정을 만들었습니다.', '5시간 전'],
-  ['지수', '#d7e8ff', '박지수', '채택 후보를 추천했습니다.', '1일 전'],
-] as const;
-
 export function HomeScreen({ navigate }: ScreenProps) {
+  const currentUserId = useIdentity();
   const { width } = useWindowDimensions();
-  const stacked = width < 1050;
-  const compact = width < 650;
-
+  const { workspace, members, adoptedSongs, recommendations, rehearsals } = useMockAppState();
+  const next = rehearsals
+    .filter((event) => new Date(`${event.date}T${event.end}`) >= new Date())
+    .sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))[0];
+  const ready = adoptedSongs.filter((song) => song.myStatus === 'READY').length;
+  const candidates = recommendations.filter(
+    (song) => !adoptedSongs.some((adopted) => adopted.id === song.id),
+  );
   return (
     <AppShell activeRoute="home" onNavigate={navigate}>
       <FlexBetween>
         <PageTop>
-          <PageHeading style={compact ? { fontSize: 25, lineHeight: 32 } : undefined}>
-            좋은 오후예요, 김민수님! 👋
-          </PageHeading>
-          <PageDescription>우리 밴드의 다음 합주를 준비해볼까요?</PageDescription>
+          <PageHeading>{workspace?.name}</PageHeading>
+          <PageDescription>{workspace?.description}</PageDescription>
         </PageTop>
-        {!compact ? (
-          <FlexRow>
-            <ActionButton secondary onPress={() => navigate('members')}>
-              멤버 초대
-            </ActionButton>
-            <Avatar color="#ffd8c8" size={38}>
-              <AvatarText>민수</AvatarText>
-            </Avatar>
-          </FlexRow>
-        ) : null}
+        {width >= 650 && (
+          <ActionButton secondary onPress={() => navigate('members')}>
+            멤버 보기
+          </ActionButton>
+        )}
       </FlexBetween>
-
-      <ResponsiveGrid stacked={stacked}>
-        <Surface style={stacked ? undefined : { flex: 1.65 }}>
+      <ResponsiveGrid stacked={width < 1050}>
+        <Surface style={{ flex: 1.6 }}>
           <FlexBetween>
             <Heading>다음 합주</Heading>
-            <Pill tone="amber">
-              <PillText tone="amber">D-3</PillText>
-            </Pill>
+            {next && (
+              <Pill tone="amber">
+                <PillText tone="amber">예정</PillText>
+              </Pill>
+            )}
           </FlexBetween>
-          <FlexRow gap={18}>
-            <View style={{ flex: 1, gap: 14 }}>
-              <FlexRow>
-                <View
-                  style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 12,
-                    backgroundColor: '#fff0ee',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <AppIcon name="calendar" color="#ef4d5e" size={24} />
-                </View>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Heading>2024년 9월 12일 (토)</Heading>
-                  <Copy>18:00 – 21:00</Copy>
-                  <Meta>홍대 합주실 A룸</Meta>
-                </View>
-              </FlexRow>
-              <View style={{ alignSelf: 'flex-start' }}>
-                <ActionButton secondary onPress={() => navigate('rehearsals')}>
-                  일정 보기 →
-                </ActionButton>
-              </View>
-            </View>
-            {width >= 760 ? (
-              <Image
-                source={rehearsalRoom as ImageSourcePropType}
-                resizeMode="cover"
-                style={{ width: 300, height: 160, borderRadius: 12 }}
-              />
-            ) : null}
-          </FlexRow>
+          {next ? (
+            <>
+              <PageHeading style={{ fontSize: 24 }}>{next.date}</PageHeading>
+              <Copy>
+                {next.title} · {next.start}–{next.end}
+              </Copy>
+              <Meta>{next.place}</Meta>
+              <Meta>{next.goal}</Meta>
+              <ActionButton secondary onPress={() => navigate('rehearsals', { id: next.id })}>
+                일정 보기 →
+              </ActionButton>
+            </>
+          ) : (
+            <>
+              <Copy>아직 예정된 합주가 없어요.</Copy>
+              <ActionButton secondary onPress={() => navigate('rehearsals')}>
+                첫 합주 만들기
+              </ActionButton>
+            </>
+          )}
         </Surface>
-
-        <Surface style={stacked ? undefined : { flex: 1 }}>
-          <Heading>이번 주 준비도</Heading>
-          <FlexRow gap={14}>
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: '#edf3ff',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <AppIcon name="users" color={theme.colors.primary} size={24} />
-            </View>
-            <PageHeading style={{ fontSize: 24 }}>3 / 5 준비 완료</PageHeading>
-          </FlexRow>
-          <Progress>
-            <ProgressValue value={60} />
-          </Progress>
-          <FlexRow>
-            {['영희', '민수', '준호', '지수', '+1'].map((name, index) => (
-              <Avatar
-                key={name}
-                color={['#fde4bc', '#ffd8c8', '#d8f2e3', '#d7e8ff', '#edf1f6'][index]}
-                size={36}
-              >
-                <AvatarText>{name}</AvatarText>
+        <Surface style={{ flex: 1 }}>
+          <Heading>함께 준비하는 음악</Heading>
+          <PageHeading style={{ fontSize: 25 }}>
+            {adoptedSongs.length}곡 · {members.length}명
+          </PageHeading>
+          <FlexRow wrap>
+            {members.map((member) => (
+              <Avatar key={member.id} color={member.color} size={34}>
+                <AvatarText>{member.initials}</AvatarText>
               </Avatar>
             ))}
           </FlexRow>
-          <Meta>멤버들의 준비 상황을 확인하고 함께 연습해요!</Meta>
+          <Meta>
+            내 준비 완료 {ready} / {adoptedSongs.length}곡
+          </Meta>
+          <Progress>
+            <ProgressValue value={adoptedSongs.length ? (ready / adoptedSongs.length) * 100 : 0} />
+          </Progress>
         </Surface>
       </ResponsiveGrid>
-
-      <ResponsiveGrid stacked={stacked}>
-        <Stack gap={16} style={stacked ? undefined : { flex: 1.25 }}>
+      <ResponsiveGrid stacked={width < 1050}>
+        <Stack style={{ flex: 1.4 }}>
           <Surface>
             <FlexBetween>
-              <Heading>준비가 필요한 곡</Heading>
-              <Meta
-                onPress={() => navigate('songs')}
-                style={{ color: theme.colors.primary, fontWeight: '800' }}
-              >
+              <Heading>함께 연습할 곡</Heading>
+              <ActionButton secondary compact onPress={() => navigate('songs')}>
                 전체 보기 →
-              </Meta>
+              </ActionButton>
             </FlexBetween>
-            {songs.map((song) => (
+            {adoptedSongs.map((song) => (
               <View
-                key={song.title}
+                key={song.id}
                 style={{
                   paddingVertical: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: theme.colors.border,
+                  gap: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: '#edf1f6',
                 }}
               >
                 <FlexRow gap={12}>
-                  <SongCover id={song.id} size={54} />
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Copy style={{ fontWeight: '800' }}>{song.title}</Copy>
-                    <Meta>{song.artist}</Meta>
-                    <FlexRow>
-                      <Slider value={song.value} />
-                      <Meta>{song.ready} 준비</Meta>
-                    </FlexRow>
+                  <SongCover id={song.id} size={50} />
+                  <View style={{ flex: 1 }}>
+                    <Copy style={{ fontWeight: '500' }}>{song.title}</Copy>
+                    <Meta>
+                      {song.artist} · {song.ready}/{song.total} 파트 준비
+                    </Meta>
                   </View>
-                  <ActionButton compact onPress={() => navigate('practice')}>
+                  <ActionButton compact onPress={() => navigate('practice', { id: song.id })}>
                     연습하기
                   </ActionButton>
                 </FlexRow>
+                <Progress>
+                  <ProgressValue value={song.total ? (song.ready / song.total) * 100 : 0} />
+                </Progress>
               </View>
             ))}
+            {!adoptedSongs.length && <Meta>곡 추천에서 첫 연습곡을 골라보세요.</Meta>}
           </Surface>
-          <Surface tint="#f5f8ff">
-            <FlexBetween>
-              <View style={{ gap: 3 }}>
-                <Heading>새 합주 만들기</Heading>
-                <Meta>다음 일정을 만들고 멤버에게 공유하세요.</Meta>
-              </View>
-              <ActionButton onPress={() => navigate('rehearsals')}>+ 합주 만들기</ActionButton>
-            </FlexBetween>
+          <Surface tint="#f4f7ff">
+            <Heading>새 합주 준비하기</Heading>
+            <Meta>다음 일정을 만들고 같은 목표로 연습해요.</Meta>
+            <ActionButton onPress={() => navigate('rehearsals')}>합주 일정 관리 →</ActionButton>
           </Surface>
         </Stack>
-
-        <Stack gap={16} style={stacked ? undefined : { flex: 1 }}>
+        <Stack style={{ flex: 1 }}>
           <Surface>
-            <FlexBetween>
-              <Heading>🔥 채택 후보</Heading>
-              <Pill tone="amber">
-                <PillText tone="amber">투표 D-2</PillText>
-              </Pill>
-            </FlexBetween>
-            <FlexRow gap={14}>
-              <SongCover id="nirvana" size={92} />
-              <View style={{ flex: 1, gap: 5 }}>
-                <Copy style={{ fontWeight: '800' }}>Smells Like Teen Spirit</Copy>
-                <Meta>Nirvana</Meta>
-                <Copy numberOfLines={2}>에너지 있고 재미있게 합주할 수 있을 것 같아요!</Copy>
-                <FlexRow>
-                  <Meta>♥ 8</Meta>
-                  <Meta>🎸 6</Meta>
-                  <Meta>▢ 10</Meta>
-                </FlexRow>
-              </View>
-            </FlexRow>
-            <ActionButton
-              secondary
-              onPress={() => navigate('recommendation', { id: 'teen-spirit' })}
-            >
-              후보 상세 보기
+            <Heading>다음 채택 후보</Heading>
+            {candidates.length ? (
+              candidates.slice(0, 3).map((song) => (
+                <View key={song.id} style={{ gap: 8 }}>
+                  <Copy style={{ fontWeight: '500' }}>{song.title}</Copy>
+                  <Meta>
+                    {song.artist} · 좋아요 {song.likes} · 채택 추천 {song.votes}
+                  </Meta>
+                  <ActionButton
+                    secondary
+                    onPress={() => navigate('recommendation', { id: song.id })}
+                  >
+                    후보 상세 보기
+                  </ActionButton>
+                </View>
+              ))
+            ) : (
+              <Meta>새로운 곡을 추천하고 의견을 나눠보세요.</Meta>
+            )}
+            <ActionButton secondary onPress={() => navigate('recommendations')}>
+              곡 추천 보기 →
             </ActionButton>
           </Surface>
           <Surface>
-            <FlexBetween>
-              <Heading>최근 활동</Heading>
-              <Meta>모두 보기 →</Meta>
-            </FlexBetween>
-            {activities.map(([initial, color, name, message, time]) => (
-              <FlexRow key={message} gap={10}>
-                <Avatar color={color} size={34}>
-                  <AvatarText>{initial}</AvatarText>
-                </Avatar>
-                <View style={{ flex: 1 }}>
-                  <Copy>
-                    <Copy style={{ fontWeight: '800' }}>{name}</Copy> {message}
-                  </Copy>
-                  <Meta>{time}</Meta>
-                </View>
-              </FlexRow>
-            ))}
+            <Heading>우리 밴드</Heading>
+            <Copy>
+              {members.find((member) => member.id === currentUserId)?.part} 파트로 함께하고 있어요.
+            </Copy>
+            <Meta>다른 밴드의 일정과 참여 곡은 개인 공간에서 함께 확인할 수 있어요.</Meta>
+            <ActionButton secondary onPress={() => navigate('personal-home')}>
+              개인 홈으로 →
+            </ActionButton>
           </Surface>
         </Stack>
       </ResponsiveGrid>

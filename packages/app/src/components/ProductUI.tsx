@@ -29,11 +29,12 @@ export function PageTop({ style, ...props }: ViewProps) {
 export const PageHeading = styled.Text`
   color: ${theme.colors.text};
   font-size: 30px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.6px;
 `;
 
 export const PageDescription = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.textMuted};
   font-size: 15px;
   line-height: 22px;
@@ -42,22 +43,24 @@ export const PageDescription = styled.Text`
 export const Heading = styled.Text`
   color: ${theme.colors.text};
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
 `;
 
 export const SmallHeading = styled.Text`
   color: ${theme.colors.text};
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const Meta = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.textMuted};
   font-size: 12px;
   line-height: 18px;
 `;
 
 export const Copy = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.text};
   font-size: 14px;
   line-height: 21px;
@@ -115,76 +118,6 @@ export function Stack({ gap = 10, style, ...props }: ViewProps & { gap?: number 
   return <View {...props} style={[{ gap }, style]} />;
 }
 
-export function ComingSoonOverlay({
-  label = '추후 개발됩니다',
-  description = '현재 화면은 미리보기이며, 기능은 다음 개발 단계에서 제공할 예정입니다.',
-  compact,
-  onBack,
-  style,
-}: {
-  label?: string;
-  description?: string;
-  compact?: boolean;
-  onBack?: () => void;
-  style?: ViewProps['style'];
-}) {
-  return (
-    <Pressable
-      accessibilityRole="text"
-      accessibilityLabel={`${label}. ${description}`}
-      style={[
-        {
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 50,
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: compact ? 12 : 24,
-          borderRadius: compact ? 16 : 0,
-          backgroundColor: 'rgba(244, 247, 252, 0.88)',
-        },
-        style,
-      ]}
-    >
-      <View
-        style={{
-          width: '100%',
-          maxWidth: compact ? 360 : 440,
-          paddingVertical: compact ? 16 : 24,
-          paddingHorizontal: compact ? 18 : 26,
-          gap: 7,
-          alignItems: 'center',
-          borderWidth: 1,
-          borderColor: '#d8e2f1',
-          borderRadius: 16,
-          backgroundColor: 'white',
-          shadowColor: '#20304a',
-          shadowOpacity: 0.12,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 6,
-        }}
-      >
-        <SoftIcon size={compact ? 36 : 46}>
-          <AppIcon name="sparkles" color={theme.colors.primary} size={compact ? 18 : 22} />
-        </SoftIcon>
-        <Heading style={{ textAlign: 'center' }}>{label}</Heading>
-        {!compact ? <Meta style={{ textAlign: 'center' }}>{description}</Meta> : null}
-        {!compact && onBack ? (
-          <View style={{ marginTop: 7 }}>
-            <ActionButton secondary onPress={onBack}>
-              ← 뒤로가기
-            </ActionButton>
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
 export const Divider = styled.View`
   height: 1px;
   background-color: ${theme.colors.border};
@@ -205,7 +138,7 @@ export const OutlineButton = styled.Pressable<{ danger?: boolean; compact?: bool
 export const OutlineButtonText = styled.Text<{ danger?: boolean }>`
   color: ${({ danger }) => (danger ? theme.colors.danger : theme.colors.primary)};
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const PrimaryButton = styled.Pressable<{ danger?: boolean; compact?: boolean }>`
@@ -223,7 +156,7 @@ export const PrimaryButton = styled.Pressable<{ danger?: boolean; compact?: bool
 export const PrimaryButtonText = styled.Text`
   color: white;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const Pill = styled.Pressable<{ active?: boolean; tone?: 'green' | 'amber' | 'red' }>`
@@ -253,7 +186,7 @@ export const PillText = styled.Text<{ active?: boolean; tone?: 'green' | 'amber'
             ? '#d93d4b'
             : '#50617d'};
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const Progress = styled.View`
@@ -348,7 +281,7 @@ export function StatTile({
       </SoftIcon>
       <View style={{ gap: 2 }}>
         <Meta>{label}</Meta>
-        <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900' }}>{value}</Text>
+        <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '600' }}>{value}</Text>
       </View>
     </StatSurface>
   );
@@ -361,11 +294,38 @@ export const CoverImage = styled.Image<{ size?: number }>`
   border-radius: 10px;
 `;
 
-export function SongCover({ id, size = 72 }: { id: string; size?: number }) {
-  const thumbnailUrl = getSongThumbnail(id);
+export function SongCover({
+  id,
+  size = 72,
+  thumbnailUrl,
+}: {
+  id: string;
+  size?: number;
+  thumbnailUrl?: string;
+}) {
+  const source = thumbnailUrl ?? getSongThumbnail(id);
+  if (!source)
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          flexShrink: 0,
+          marginRight: 6,
+          borderRadius: 10,
+          backgroundColor: '#edf3ff',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: theme.colors.primary, fontSize: size / 3, fontWeight: '400' }}>
+          ♪
+        </Text>
+      </View>
+    );
   return (
     <CoverImage
-      source={thumbnailUrl ? { uri: thumbnailUrl } : undefined}
+      source={{ uri: source }}
       resizeMode="cover"
       size={size}
       style={{ width: size, height: size, flexShrink: 0, marginRight: 6 }}
@@ -442,6 +402,8 @@ export function ActionButton({
         compact={compact}
         onPress={onPress}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
         style={{
           gap: 7,
           minHeight: compact ? 34 : 40,
@@ -459,6 +421,8 @@ export function ActionButton({
       compact={compact}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       style={{
         gap: 7,
         minHeight: compact ? 34 : 40,
@@ -523,7 +487,7 @@ export function CheckItem({
           backgroundColor: checked ? theme.colors.primary : 'white',
         }}
       >
-        {checked ? <Text style={{ color: 'white', fontWeight: '900' }}>✓</Text> : null}
+        {checked ? <Text style={{ color: 'white', fontWeight: '600' }}>✓</Text> : null}
       </View>
       <Copy style={{ flex: 1 }}>{label}</Copy>
       {meta}

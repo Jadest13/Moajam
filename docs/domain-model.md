@@ -46,6 +46,10 @@ User ── PersonalWorkspace
 8. ScoreSyncPoint의 `timeMs`는 Song의 공통 Timeline을 기준으로 한다.
 9. PracticeTake의 Offset 변경은 원본 Source와 ScoreSyncPoint를 변경하지 않는다.
 10. `PRIVATE` PracticeTake는 작성자 외의 Workspace Member에게 노출하지 않는다.
+11. 한 User는 여러 Workspace의 Member가 될 수 있고, 파트와 역할은 Workspace별로 독립적이다.
+12. 개인 일정·참여 곡 목록은 소속 Workspace 데이터의 통합 조회이며 별도 사본을 생성하지 않는다.
+13. 곡 상세와 연습실 이동에는 Workspace와 Song 식별자를 함께 전달한다. 같은 곡 식별자가 있어도
+    다른 Workspace의 자료나 준비 상태를 변경하지 않는다.
 
 ## 미디어 엔터티
 

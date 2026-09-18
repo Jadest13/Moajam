@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { useIdentity } from '../state/Identity';
 import { Modal, Pressable, useWindowDimensions, View } from 'react-native';
+import { api, serverConfigured } from '../lib/remote';
+import { InvitationPanel } from '../components/InvitationPanel';
 import { AppShell } from '../components/AppShell';
 import {
   ActionButton,
@@ -25,15 +28,29 @@ import { useMockAppState, type MockMember } from '../state/MockAppState';
 import { Avatar, AvatarText, Input } from '../styles/layout';
 
 export function MembersScreen({ navigate }: ScreenProps) {
+  const currentUserId = useIdentity();
   const { width } = useWindowDimensions();
-  const { members, removeMember, updateMember } = useMockAppState();
+  const {
+    members,
+    removeMember,
+    updateMember,
+    workspace,
+    workspaceId,
+    canManage,
+    adoptedSongs,
+    actionError,
+  } = useMockAppState();
   const [invite, setInvite] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [menuMemberId, setMenuMemberId] = useState<string | null>(null);
   const [editingMember, setEditingMember] = useState<MockMember | null>(null);
   const [draftPart, setDraftPart] = useState('');
   const [draftRole, setDraftRole] = useState('MEMBER');
   const [reminderSent, setReminderSent] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState(
+    '다음 합주 전 준비 상태와 체크리스트를 확인해주세요.',
+  );
+  const [reminderStatus, setReminderStatus] = useState('');
+  const [query, setQuery] = useState('');
 
   const openRoleEditor = (member: MockMember) => {
     setEditingMember(member);
@@ -44,8 +61,8 @@ export function MembersScreen({ navigate }: ScreenProps) {
 
   const saveMember = () => {
     if (!editingMember) return;
-    updateMember(editingMember.id, { part: draftPart, role: draftRole });
-    setEditingMember(null);
+    if (updateMember(editingMember.id, { part: draftPart, role: draftRole }))
+      setEditingMember(null);
   };
   return (
     <AppShell activeRoute="members" onNavigate={navigate}>
@@ -58,107 +75,95 @@ export function MembersScreen({ navigate }: ScreenProps) {
         </PageTop>
         <ActionButton onPress={() => setInvite(!invite)}>+ 멤버 초대</ActionButton>
       </FlexBetween>
-      {invite ? (
-        <Surface tint="#f7f9ff">
-          <FlexBetween>
-            <View style={{ flex: 1 }}>
-              <Heading>초대 링크</Heading>
-              <Meta>링크를 가진 사람은 Member 권한으로 가입할 수 있어요.</Meta>
-            </View>
-            <Pill tone="green">
-              <PillText tone="green">7일 후 만료</PillText>
-            </Pill>
-          </FlexBetween>
-          <FlexRow>
-            <Input editable={false} value="https://moajam.app/invite/abc123" style={{ flex: 1 }} />
-            <ActionButton onPress={() => setCopied(true)}>
-              {copied ? '복사됨 ✓' : '링크 복사'}
-            </ActionButton>
-          </FlexRow>
-        </Surface>
-      ) : null}
+      {invite ? <InvitationPanel workspaceId={workspaceId} canManage={canManage} /> : null}
+      <Input value={query} onChangeText={setQuery} placeholder="멤버 이름 또는 파트 검색" />
       <ResponsiveGrid stacked={width < 940}>
         <Stack gap={12} style={width < 940 ? undefined : { flex: 1.45 }}>
           <Surface>
             <FlexBetween>
               <Heading>팀 멤버 {members.length}</Heading>
-              <Meta>Sunset Riders</Meta>
+              <Meta>{workspace?.name}</Meta>
             </FlexBetween>
-            {members.map((member, index) => (
-              <View key={member.id}>
-                <FlexBetween>
-                  <FlexRow>
-                    <Avatar color={member.color} size={44}>
-                      <AvatarText>{member.initials}</AvatarText>
-                    </Avatar>
-                    <View>
-                      <Copy style={{ fontWeight: '900' }}>
-                        {member.name}
-                        {index === 0 ? ' (나)' : ''}
-                      </Copy>
-                      <Meta>
-                        {index === 0 ? '오늘 활동' : index < 3 ? '2시간 전 활동' : '어제 활동'}
-                      </Meta>
-                    </View>
-                  </FlexRow>
-                  <FlexRow>
-                    <Pill>
-                      <PillText>{member.part}</PillText>
-                    </Pill>
-                    {member.role === 'OWNER' ? (
-                      <Pill tone="amber">
-                        <PillText tone="amber">Owner</PillText>
-                      </Pill>
-                    ) : null}
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${member.name} 메뉴`}
-                      onPress={() =>
-                        setMenuMemberId((current) => (current === member.id ? null : member.id))
-                      }
-                      style={{
-                        width: 36,
-                        height: 36,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: 10,
-                        backgroundColor: menuMemberId === member.id ? '#eef3ff' : 'transparent',
-                      }}
-                    >
-                      <Copy style={{ fontSize: 22 }}>⋮</Copy>
-                    </Pressable>
-                  </FlexRow>
-                </FlexBetween>
-                {menuMemberId === member.id ? (
-                  <Surface tint="#f8faff" style={{ marginTop: 10, padding: 12 }}>
-                    <FlexBetween>
+            {members
+              .filter((member) =>
+                (member.name + ' ' + member.part).toLowerCase().includes(query.toLowerCase()),
+              )
+              .map((member, index) => (
+                <View key={member.id}>
+                  <FlexBetween>
+                    <FlexRow>
+                      <Avatar color={member.color} size={44}>
+                        <AvatarText>{member.initials}</AvatarText>
+                      </Avatar>
                       <View>
-                        <Copy style={{ fontWeight: '900' }}>{member.name} 관리</Copy>
-                        <Meta>역할과 권한을 변경하거나 팀에서 삭제할 수 있어요.</Meta>
+                        <Copy style={{ fontWeight: '600' }}>
+                          {member.name}
+                          {index === 0 ? ' (나)' : ''}
+                        </Copy>
+                        <Meta>
+                          {index === 0 ? '오늘 활동' : index < 3 ? '2시간 전 활동' : '어제 활동'}
+                        </Meta>
                       </View>
-                      <FlexRow wrap>
-                        <ActionButton secondary compact onPress={() => openRoleEditor(member)}>
-                          역할 변경
-                        </ActionButton>
-                        <ActionButton
-                          secondary
-                          danger
-                          compact
-                          disabled={index === 0}
-                          onPress={() => {
-                            removeMember(member.id);
-                            setMenuMemberId(null);
-                          }}
-                        >
-                          {index === 0 ? '본인 삭제 불가' : '멤버 삭제'}
-                        </ActionButton>
-                      </FlexRow>
-                    </FlexBetween>
-                  </Surface>
-                ) : null}
-                {index < members.length - 1 ? <Divider /> : null}
-              </View>
-            ))}
+                    </FlexRow>
+                    <FlexRow>
+                      <Pill>
+                        <PillText>{member.part}</PillText>
+                      </Pill>
+                      {member.role === 'OWNER' ? (
+                        <Pill tone="amber">
+                          <PillText tone="amber">Owner</PillText>
+                        </Pill>
+                      ) : null}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${member.name} 메뉴`}
+                        disabled={!canManage}
+                        onPress={() =>
+                          setMenuMemberId((current) => (current === member.id ? null : member.id))
+                        }
+                        style={{
+                          width: 36,
+                          height: 36,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 10,
+                          backgroundColor: menuMemberId === member.id ? '#eef3ff' : 'transparent',
+                        }}
+                      >
+                        <Copy style={{ fontSize: 22 }}>⋮</Copy>
+                      </Pressable>
+                    </FlexRow>
+                  </FlexBetween>
+                  {menuMemberId === member.id ? (
+                    <Surface tint="#f8faff" style={{ marginTop: 10, padding: 12 }}>
+                      <FlexBetween>
+                        <View>
+                          <Copy style={{ fontWeight: '600' }}>{member.name} 관리</Copy>
+                          <Meta>역할과 권한을 변경하거나 팀에서 삭제할 수 있어요.</Meta>
+                        </View>
+                        <FlexRow wrap>
+                          <ActionButton secondary compact onPress={() => openRoleEditor(member)}>
+                            역할 변경
+                          </ActionButton>
+                          <ActionButton
+                            secondary
+                            danger
+                            compact
+                            disabled={member.id === currentUserId}
+                            onPress={() => {
+                              removeMember(member.id);
+                              setMenuMemberId(null);
+                            }}
+                          >
+                            {member.id === currentUserId ? '본인 삭제 불가' : '멤버 삭제'}
+                          </ActionButton>
+                        </FlexRow>
+                      </FlexBetween>
+                    </Surface>
+                  ) : null}
+                  {index < members.length - 1 ? <Divider /> : null}
+                </View>
+              ))}
           </Surface>
         </Stack>
         <Stack gap={16} style={width < 940 ? undefined : { flex: 0.85 }}>
@@ -181,19 +186,33 @@ export function MembersScreen({ navigate }: ScreenProps) {
                     <Meta>{count}명</Meta>
                   </FlexBetween>
                   <Progress>
-                    <ProgressValue value={Number(count) * 42} color={String(color)} />
+                    <ProgressValue
+                      value={members.length ? (Number(count) / members.length) * 100 : 0}
+                      color={String(color)}
+                    />
                   </Progress>
                 </View>
               );
             })}
           </Surface>
           <Surface>
-            <Heading>이번 주 준비</Heading>
-            <PageHeading style={{ fontSize: 25 }}>3 / 5 준비 완료</PageHeading>
+            <Heading>내 연습 준비</Heading>
+            <PageHeading style={{ fontSize: 25 }}>
+              {adoptedSongs.filter((song) => song.myStatus === 'READY').length} /{' '}
+              {adoptedSongs.length}곡 준비 완료
+            </PageHeading>
             <Progress>
-              <ProgressValue value={60} />
+              <ProgressValue
+                value={
+                  adoptedSongs.length
+                    ? (adoptedSongs.filter((song) => song.myStatus === 'READY').length /
+                        adoptedSongs.length) *
+                      100
+                    : 0
+                }
+              />
             </Progress>
-            <Meta>아직 준비 표시를 하지 않은 멤버에게 알림을 보낼 수 있어요.</Meta>
+            <Meta>밴드 멤버에게 앱 안의 알림을 보낼 수 있어요.</Meta>
             <ActionButton secondary onPress={() => setReminderSent(true)}>
               리마인드 보내기
             </ActionButton>
@@ -234,7 +253,7 @@ export function MembersScreen({ navigate }: ScreenProps) {
               </Pressable>
             </FlexBetween>
             <View style={{ gap: 8 }}>
-              <Copy style={{ fontWeight: '900' }}>담당 파트</Copy>
+              <Copy style={{ fontWeight: '600' }}>담당 파트</Copy>
               <FlexRow wrap>
                 {['Vocal', 'Guitar', 'Guitar 2', 'Bass', 'Drums', 'Keyboard'].map((part) => (
                   <Pill key={part} active={draftPart === part} onPress={() => setDraftPart(part)}>
@@ -244,7 +263,7 @@ export function MembersScreen({ navigate }: ScreenProps) {
               </FlexRow>
             </View>
             <View style={{ gap: 8 }}>
-              <Copy style={{ fontWeight: '900' }}>워크스페이스 권한</Copy>
+              <Copy style={{ fontWeight: '600' }}>워크스페이스 권한</Copy>
               <FlexRow>
                 {['MEMBER', 'OWNER'].map((role) => (
                   <Pill key={role} active={draftRole === role} onPress={() => setDraftRole(role)}>
@@ -259,6 +278,7 @@ export function MembersScreen({ navigate }: ScreenProps) {
               <ActionButton secondary onPress={() => setEditingMember(null)}>
                 취소
               </ActionButton>
+              {actionError ? <Meta accessibilityRole="alert">{actionError}</Meta> : null}
               <ActionButton disabled={!draftPart} onPress={saveMember}>
                 변경사항 저장
               </ActionButton>
@@ -298,13 +318,31 @@ export function MembersScreen({ navigate }: ScreenProps) {
                   backgroundColor: '#e9f8f0',
                 }}
               >
-                <Copy style={{ color: '#16a36a', fontSize: 24, fontWeight: '900' }}>✓</Copy>
+                <Copy style={{ color: '#16a36a', fontSize: 24, fontWeight: '600' }}>✓</Copy>
               </View>
-              <Heading>리마인드 메시지를 보냈어요</Heading>
+              <Heading>리마인드 안내</Heading>
               <Meta style={{ textAlign: 'center' }}>
-                알림 연동 전이라 현재는 미리보기 팝업만 표시됩니다.
+                {serverConfigured
+                  ? '밴드 멤버의 알림함으로 아래 내용을 보냅니다.'
+                  : '알림 발송에는 서버 로그인이 필요합니다.'}
               </Meta>
-              <ActionButton onPress={() => setReminderSent(false)}>확인</ActionButton>
+              <Input multiline value={reminderMessage} onChangeText={setReminderMessage} />
+              <ActionButton
+                disabled={!serverConfigured || !canManage || !reminderMessage.trim()}
+                onPress={() =>
+                  void api(`/workspaces/${workspaceId}/reminders`, 'POST', {
+                    message: reminderMessage.trim(),
+                  })
+                    .then(() => setReminderStatus('밴드 멤버의 알림함에 전달했습니다.'))
+                    .catch((error: Error) => setReminderStatus(error.message))
+                }
+              >
+                알림 보내기
+              </ActionButton>
+              {reminderStatus ? <Meta>{reminderStatus}</Meta> : null}
+              <ActionButton secondary onPress={() => setReminderSent(false)}>
+                닫기
+              </ActionButton>
             </Surface>
           </Pressable>
         </Pressable>

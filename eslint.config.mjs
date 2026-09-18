@@ -6,7 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/.expo/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '**/.expo/**', 'legacy/**'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs['recommended-latest'],

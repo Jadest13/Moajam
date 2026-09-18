@@ -1,162 +1,167 @@
-import { theme } from '@moajam/ui';
 import { useState } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { AccountPanel } from '../components/AccountPanel';
 import { AppShell } from '../components/AppShell';
 import {
   ActionButton,
   Copy,
-  FlexBetween,
   FlexRow,
   Heading,
   Meta,
-  PageDescription,
   PageHeading,
-  PageTop,
-  ResponsiveGrid,
-  Stack,
+  Pill,
+  PillText,
   Surface,
   Toggle,
 } from '../components/ProductUI';
+import { ProfilePhoto } from '../components/ProfilePhoto';
+import { usePreferences, updatePreferences } from '../state/preferences';
+import { useMockAppState } from '../state/MockAppState';
+import { downloadText } from '../lib/platformActions';
+import { Input } from '../styles/layout';
 import type { ScreenProps } from '../navigation';
-import { Avatar, AvatarText, Input } from '../styles/layout';
-
+import { api, serverConfigured } from '../lib/remote';
 export function SettingsScreen({ navigate }: ScreenProps) {
-  const { width } = useWindowDimensions();
-  const [push, setPush] = useState(true);
-  const [email, setEmail] = useState(false);
-  const [reminder, setReminder] = useState(true);
-  const [saved, setSaved] = useState(false);
-
+  const preferences = usePreferences();
+  const [draft, setDraft] = useState(preferences);
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { workspace, workspaces, canManage } = useMockAppState();
+  const save = async () => {
+    if (!draft.name.trim()) {
+      setMessage('이름을 입력해주세요.');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (serverConfigured) await api('/me', 'PUT', { displayName: draft.name.trim() });
+      updatePreferences({ ...draft, name: draft.name.trim() });
+      setMessage('설정을 저장했습니다.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : '설정을 저장하지 못했습니다. 저장 공간과 연결을 확인해주세요.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <AppShell activeRoute="settings" onNavigate={navigate}>
-      <PageTop>
-        <PageHeading>설정</PageHeading>
-        <PageDescription>프로필, 알림, 오디오와 워크스페이스 환경을 관리합니다.</PageDescription>
-      </PageTop>
-      <ResponsiveGrid stacked={width < 900}>
-        <Stack gap={16} style={width < 900 ? undefined : { flex: 1.2 }}>
-          <Surface>
-            <Heading>내 프로필</Heading>
-            <FlexRow>
-              <Avatar color="#ffd8c8" size={64}>
-                <AvatarText>민수</AvatarText>
-              </Avatar>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Copy style={{ fontWeight: '900' }}>김민수</Copy>
-                <Meta>Sunset Riders · Guitar</Meta>
-              </View>
-              <ActionButton secondary>사진 변경</ActionButton>
-            </FlexRow>
-            <Meta>이름</Meta>
-            <Input defaultValue="김민수" />
-            <Meta>소개</Meta>
-            <Input defaultValue="기타와 좋은 합주를 좋아합니다." />
-            <View style={{ alignSelf: 'flex-start' }}>
-              <ActionButton onPress={() => setSaved(true)}>
-                {saved ? '저장됨 ✓' : '변경사항 저장'}
-              </ActionButton>
-            </View>
-          </Surface>
-          <Surface>
-            <Heading>오디오 기본 설정</Heading>
-            <FlexBetween>
-              <View>
-                <Copy style={{ fontWeight: '800' }}>재생 음질</Copy>
-                <Meta>Wi-Fi에서는 고음질로 재생합니다.</Meta>
-              </View>
-              <Copy>고음질 ▾</Copy>
-            </FlexBetween>
-            <FlexBetween>
-              <View>
-                <Copy style={{ fontWeight: '800' }}>녹음 카운트인</Copy>
-                <Meta>녹음 시작 전 2마디를 들려줍니다.</Meta>
-              </View>
-              <Copy>2마디 ▾</Copy>
-            </FlexBetween>
-            <FlexBetween>
-              <View>
-                <Copy style={{ fontWeight: '800' }}>기본 내보내기</Copy>
-                <Meta>스템과 내 녹음에 사용할 형식입니다.</Meta>
-              </View>
-              <Copy>WAV · 48kHz ▾</Copy>
-            </FlexBetween>
-          </Surface>
-        </Stack>
-        <Stack gap={16} style={width < 900 ? undefined : { flex: 1 }}>
-          <Surface>
-            <Heading>알림</Heading>
-            <SettingToggle
-              label="푸시 알림"
-              detail="댓글, 합주 변경, 멤버 초대를 알려드려요."
-              value={push}
-              onPress={() => setPush(!push)}
-            />
-            <SettingToggle
-              label="이메일 요약"
-              detail="매주 월요일에 활동을 요약해요."
-              value={email}
-              onPress={() => setEmail(!email)}
-            />
-            <SettingToggle
-              label="합주 1일 전 알림"
-              detail="준비 상태와 체크리스트를 함께 알려드려요."
-              value={reminder}
-              onPress={() => setReminder(!reminder)}
-            />
-          </Surface>
-          <Surface>
-            <Heading>워크스페이스</Heading>
-            <FlexBetween>
-              <View>
-                <Copy style={{ fontWeight: '800' }}>Sunset Riders</Copy>
-                <Meta>Owner · 멤버 5명</Meta>
-              </View>
-              <ActionButton secondary onPress={() => navigate('members')}>
-                관리
-              </ActionButton>
-            </FlexBetween>
-            <FlexBetween>
-              <Meta>초대 링크</Meta>
-              <Copy style={{ color: theme.colors.primary }}>moajam.app/join/abc123</Copy>
-            </FlexBetween>
-          </Surface>
-          <Surface danger>
-            <Heading>계정</Heading>
-            <Meta>로그아웃하거나 계정과 개인 데이터를 삭제할 수 있습니다.</Meta>
-            <FlexRow wrap>
-              <ActionButton secondary>로그아웃</ActionButton>
-              <ActionButton secondary danger>
-                계정 삭제
-              </ActionButton>
-            </FlexRow>
-          </Surface>
-          <ActionButton secondary onPress={() => navigate('help')}>
-            도움말 센터 열기
-          </ActionButton>
-        </Stack>
-      </ResponsiveGrid>
+      <PageHeading>설정</PageHeading>
+      <Surface>
+        <Heading>내 프로필</Heading>
+        <ProfilePhoto value={draft.photo} onChange={(photo) => setDraft({ ...draft, photo })} />
+        <Meta>이름</Meta>
+        <Input value={draft.name} onChangeText={(name) => setDraft({ ...draft, name })} />
+        <Meta>소개</Meta>
+        <Input multiline value={draft.bio} onChangeText={(bio) => setDraft({ ...draft, bio })} />
+      </Surface>
+      <Surface>
+        <Heading>오디오 기본 설정</Heading>
+        <Meta>기본 볼륨</Meta>
+        <FlexRow wrap>
+          {[0.25, 0.5, 0.8, 1].map((volume) => (
+            <Pill
+              key={volume}
+              active={draft.volume === volume}
+              onPress={() => setDraft({ ...draft, volume })}
+            >
+              <PillText>{Math.round(volume * 100)}%</PillText>
+            </Pill>
+          ))}
+        </FlexRow>
+        <Meta>메트로놈 BPM (30–300)</Meta>
+        <Input
+          keyboardType="numeric"
+          value={String(draft.bpm)}
+          onChangeText={(value) =>
+            setDraft({ ...draft, bpm: Math.max(30, Math.min(300, Number(value) || 30)) })
+          }
+        />
+        <FlexRow>
+          <Copy>연습 메트로놈</Copy>
+          <Toggle
+            on={draft.metronome}
+            onPress={() => setDraft({ ...draft, metronome: !draft.metronome })}
+          />
+        </FlexRow>
+        <Meta>녹음 카운트인</Meta>
+        <FlexRow wrap>
+          {[0, 4, 8].map((countIn) => (
+            <Pill
+              key={countIn}
+              active={draft.countIn === countIn}
+              onPress={() => setDraft({ ...draft, countIn })}
+            >
+              <PillText>{countIn ? `${countIn}박` : '없음'}</PillText>
+            </Pill>
+          ))}
+        </FlexRow>
+      </Surface>
+      <Surface>
+        <Heading>알림 수신 설정</Heading>
+        <Meta>수신 선호를 저장합니다. 서버 알림 채널이 연결되면 적용됩니다.</Meta>
+        {(['push', 'email', 'reminder'] as const).map((key, index) => (
+          <FlexRow key={key}>
+            <Copy style={{ flex: 1 }}>
+              {['푸시 알림', '이메일 요약', '합주 하루 전 알림'][index]}
+            </Copy>
+            <Toggle on={draft[key]} onPress={() => setDraft({ ...draft, [key]: !draft[key] })} />
+          </FlexRow>
+        ))}
+      </Surface>
+      <FlexRow wrap>
+        <ActionButton disabled={saving} onPress={() => void save()}>
+          {saving ? '저장 중…' : '변경사항 저장'}
+        </ActionButton>
+        <ActionButton
+          secondary
+          onPress={() => {
+            setDraft(preferences);
+            setMessage('변경 내용을 취소했습니다.');
+          }}
+        >
+          변경 취소
+        </ActionButton>
+      </FlexRow>
+      {message ? <Meta accessibilityLiveRegion="polite">{message}</Meta> : null}
+      <Surface>
+        <Heading>현재 밴드</Heading>
+        <Copy>
+          {workspace?.name} · {canManage ? 'Owner' : 'Member'}
+        </Copy>
+        <ActionButton secondary onPress={() => navigate('members')}>
+          멤버 관리
+        </ActionButton>
+      </Surface>
+      <AccountPanel />
+      <Surface>
+        <Heading>내 데이터</Heading>
+        <Meta>
+          브라우저에 저장된 밴드 기록을 JSON으로 내려받습니다. 오디오와 악보 파일은 각 보관함에서
+          별도로 내려받아주세요.
+        </Meta>
+        <ActionButton
+          secondary
+          onPress={() =>
+            downloadText(
+              `moajam-backup-${new Date().toISOString().slice(0, 10)}.json`,
+              JSON.stringify(
+                { exportedAt: new Date().toISOString(), workspaces, preferences },
+                null,
+                2,
+              ),
+              'application/json',
+            )
+          }
+        >
+          기록 백업 다운로드
+        </ActionButton>
+        <ActionButton secondary onPress={() => navigate('help')}>
+          도움말과 문의
+        </ActionButton>
+      </Surface>
     </AppShell>
-  );
-}
-
-function SettingToggle({
-  label,
-  detail,
-  value,
-  onPress,
-}: {
-  label: string;
-  detail: string;
-  value: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <FlexBetween>
-      <View style={{ flex: 1 }}>
-        <Copy style={{ fontWeight: '800' }}>{label}</Copy>
-        <Meta>{detail}</Meta>
-      </View>
-      <Toggle on={value} onPress={onPress} />
-    </FlexBetween>
   );
 }

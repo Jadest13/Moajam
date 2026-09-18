@@ -47,22 +47,24 @@ export function Card({ style, ...props }: ViewProps) {
 export const Title = styled.Text`
   color: ${theme.colors.text};
   font-size: 28px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const Heading = styled.Text`
   color: ${theme.colors.text};
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 export const Body = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.text};
   font-size: 15px;
   line-height: 22px;
 `;
 
 export const Muted = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.textMuted};
   font-size: 14px;
 `;
@@ -80,7 +82,7 @@ const ButtonSurface = styled(Pressable)<{ secondary?: boolean }>`
 const ButtonLabel = styled.Text<{ secondary?: boolean }>`
   color: ${({ secondary }) => (secondary ? theme.colors.text : theme.colors.primaryInk)};
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 export function Button({
@@ -112,7 +114,7 @@ const BadgeSurface = styled.View<{ tone: 'success' | 'warning' | 'danger' | 'neu
 const BadgeLabel = styled.Text`
   color: ${theme.colors.text};
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 export function Badge({

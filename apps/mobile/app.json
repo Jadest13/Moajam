@@ -5,9 +5,20 @@
     "version": "0.1.0",
     "icon": "../../packages/app/assets/logo.png",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.moajam.app" },
-    "android": { "package": "com.moajam.app" }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.moajam.app"
+    },
+    "android": {
+      "package": "com.moajam.app"
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        { "microphonePermission": "합주와 내 연주를 녹음하려면 마이크 접근이 필요합니다." }
+      ]
+    ]
   }
 }

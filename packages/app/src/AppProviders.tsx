@@ -4,6 +4,7 @@ import { theme } from '@moajam/ui';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState, type PropsWithChildren } from 'react';
 import { MockAppStateProvider } from './state/MockAppState';
+import { IdentityProvider } from './state/Identity';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [queryClient] = useState(createQueryClient);
@@ -11,7 +12,9 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
-        <MockAppStateProvider>{children}</MockAppStateProvider>
+        <IdentityProvider>
+          <MockAppStateProvider>{children}</MockAppStateProvider>
+        </IdentityProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

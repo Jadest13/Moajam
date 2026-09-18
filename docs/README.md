@@ -7,9 +7,11 @@
 - [아키텍처](./architecture.md): 모노레포와 플랫폼 공유 전략
 - [개발 가이드](./development.md): 실행, 검사, 환경 변수, 코드 규칙
 - [MVP 로드맵](./roadmap.md): 구현 순서와 완료 기준
-- [상호작용 명세](./interaction-spec.md): 버튼·내비게이션 동작, 누락 기능, 구현 우선순위
+- [화면별 기능 명세·보완 목록](./interaction-spec.md): 전체 화면 역할, 실제 동작·저장 범위, 미연결 기능, 다음 개발 순서
+- [협업 환경 설정](./collaboration-setup.md): Supabase·DB·비공개 파일·음원 분리 연결과 검증 절차
 - [연습 미디어와 악보 동기화](./practice-media-spec.md): Stem, 개인 Take, 악보 동기 재생 기준
 - [개인 작업실](./personal-tools-spec.md): 내 악기 추출과 구조화 악보 편집 기준
+- [개인·밴드 워크스페이스 구조 기획](./workspace-structure-spec.md): legacy 화면 채용, 다중 밴드 전환, 개인 통합 조회
 
 ## 화면 시안
 

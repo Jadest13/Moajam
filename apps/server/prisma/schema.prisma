@@ -32,6 +32,8 @@ model Workspace {
   updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   createdBy   Profile           @relation("WorkspaceCreator", fields: [createdById], references: [id])
   members     WorkspaceMember[]
+  documents   WorkspaceDocument[]
+  invitations WorkspaceInvitation[]
 
   @@index([createdById])
   @@map("workspaces")
@@ -42,6 +44,7 @@ model WorkspaceMember {
   workspaceId String        @map("workspace_id") @db.Uuid
   userId      String        @map("user_id") @db.Uuid
   role        WorkspaceRole @default(MEMBER)
+  part        String        @default("") @db.VarChar(80)
   joinedAt    DateTime      @default(now()) @map("joined_at") @db.Timestamptz(3)
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -49,4 +52,71 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([userId])
   @@map("workspace_members")
+}
+
+model WorkspaceDocument {
+  workspaceId String @map("workspace_id") @db.Uuid
+  key String @db.VarChar(240)
+  value Json
+  revision Int @default(1)
+  updatedBy String @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  workspace Workspace @relation(fields:[workspaceId], references:[id], onDelete:Cascade)
+  @@id([workspaceId,key])
+  @@map("workspace_documents")
+}
+
+model WorkspaceInvitation {
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @map("workspace_id") @db.Uuid
+  tokenHash String @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revoked Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  @@index([workspaceId])
+  @@map("workspace_invitations")
+}
+
+model MediaAsset {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  workspaceId String? @map("workspace_id") @db.Uuid
+  scope String @db.VarChar(240)
+  objectKey String @unique @map("object_key")
+  name String @db.VarChar(255)
+  mime String @db.VarChar(120)
+  size Int
+  visibility String @default("PRIVATE")
+  ready Boolean @default(false)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([ownerId,scope])
+  @@index([workspaceId,scope])
+  @@map("media_assets")
+}
+
+model SeparationJob {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  sourceId String @map("source_id") @db.Uuid
+  instrument String
+  status String @default("QUEUED")
+  error String?
+  outputs Json @default("[]")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([ownerId,status])
+  @@map("separation_jobs")
+}
+
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  workspaceId String @map("workspace_id") @db.Uuid
+  message String @db.VarChar(500)
+  readAt DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([userId,readAt])
+  @@map("notifications")
 }

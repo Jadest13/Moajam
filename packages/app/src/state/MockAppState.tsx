@@ -1,80 +1,427 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 import {
-  adoptedSongs as initialAdoptedSongs,
-  members as initialMembers,
-  recommendations as initialRecommendations,
-  type RecommendationItem,
-} from '../mocks/data';
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+  type PropsWithChildren,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import { type RecommendationItem, members as initialMembers } from '../mocks/data';
+import {
+  createWorkspaces,
+  type Workspace,
+  type WorkspaceSong,
+  type Rehearsal,
+  type Preparation,
+} from '../mocks/workspaces';
+
+import {
+  personalSongs,
+  personalRehearsals,
+  setSongPreparation,
+  normalizeWorkspace,
+  summarizeSong,
+} from './workspaceModel';
+import { useIdentity } from './Identity';
+import {
+  serverConfigured,
+  loadRemoteWorkspaces,
+  saveRemoteWorkspace,
+  createRemoteWorkspace,
+} from '../lib/remote';
+import { usePreferences } from './preferences';
+import { loadWorkspaceState, saveWorkspaceState } from './workspaceStorage';
 
 export type MockMember = (typeof initialMembers)[number];
-export type AdoptedSong = RecommendationItem & {
-  ready: number;
-  total: number;
-  status: 'READY' | 'PRACTICING';
-};
-
-interface MockAppStateValue {
-  recommendations: RecommendationItem[];
-  adoptedSongs: AdoptedSong[];
-  members: MockMember[];
-  selectedRecommendationId: string;
-  addRecommendation: (song: RecommendationItem) => void;
-  selectRecommendation: (id: string) => void;
-  adoptSong: (id: string) => void;
-  isAdopted: (id: string) => boolean;
-  updateMember: (id: string, changes: Pick<MockMember, 'part' | 'role'>) => void;
-  removeMember: (id: string) => void;
+export type AdoptedSong = WorkspaceSong;
+interface Store {
+  workspaces: Workspace[];
+  setWorkspaces: React.Dispatch<React.SetStateAction<Workspace[]>>;
+  selectedWorkspaceId: string;
+  selectWorkspace: (id: string) => void;
+  storageError: boolean;
+  actionError: string;
+  setActionError: (message: string) => void;
+  syncStatus: string;
+  reloadRemote: () => Promise<void>;
 }
-
-const MockAppStateContext = createContext<MockAppStateValue | null>(null);
-
+const StoreContext = createContext<Store | null>(null);
+const WorkspaceScope = createContext<string | undefined>(undefined);
+export function WorkspaceScopeProvider({ id, children }: PropsWithChildren<{ id?: string }>) {
+  return <WorkspaceScope.Provider value={id}>{children}</WorkspaceScope.Provider>;
+}
 export function MockAppStateProvider({ children }: PropsWithChildren) {
-  const [recommendations, setRecommendations] = useState<RecommendationItem[]>(() => [
-    ...initialRecommendations,
-  ]);
-  const [adoptedSongs, setAdoptedSongs] = useState<AdoptedSong[]>(() =>
-    initialAdoptedSongs.map((song) => ({
-      ...song,
-      status: song.status as AdoptedSong['status'],
-    })),
+  const identity = useIdentity();
+  const [saved] = useState(() => (serverConfigured ? null : loadWorkspaceState()));
+  const [workspaces, setWorkspaces] = useState(() =>
+    (saved?.workspaces ?? (serverConfigured ? [] : createWorkspaces())).map((band) =>
+      normalizeWorkspace(band, identity),
+    ),
   );
-  const [members, setMembers] = useState<MockMember[]>(() => [...initialMembers]);
-  const [selectedRecommendationId, setSelectedRecommendationId] = useState('creep');
+  const [selectedWorkspaceId, selectWorkspace] = useState(saved?.selectedWorkspaceId ?? 'ws-demo');
+  const [storageError, setStorageError] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [syncStatus, setSyncStatus] = useState(
+    serverConfigured ? '서버 데이터 불러오는 중…' : '브라우저에 보관',
+  );
+  const remoteReady = useRef(false);
+  const failed = useRef(false);
+  const acknowledged = useRef<Workspace[]>([]);
+  const queue = useRef(Promise.resolve());
+  const reloadRemote = useCallback(async () => {
+    try {
+      await queue.current;
+      const bands = (await loadRemoteWorkspaces()).map((band) =>
+        normalizeWorkspace(band, identity),
+      );
+      acknowledged.current = bands;
+      remoteReady.current = true;
+      failed.current = false;
+      setWorkspaces(bands);
+      selectWorkspace((selected) =>
+        bands.some((band) => band.id === selected) ? selected : (bands[0]?.id ?? ''),
+      );
+      setSyncStatus('서버 저장됨');
+      setActionError('');
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : '서버에 연결하지 못했습니다.');
+      setSyncStatus('서버 연결 실패');
+    }
+  }, [identity]);
+  useEffect(() => {
+    if (serverConfigured) void reloadRemote();
+  }, [reloadRemote]);
 
-  const value = useMemo<MockAppStateValue>(
+  useEffect(() => {
+    if (!serverConfigured) {
+      setStorageError(!saveWorkspaceState({ version: 1, workspaces, selectedWorkspaceId }));
+      return;
+    }
+    if (!remoteReady.current || failed.current) return;
+    const snapshot = workspaces;
+    queue.current = queue.current.then(async () => {
+      if (failed.current) return;
+      for (const band of snapshot) {
+        const previous = acknowledged.current.find((item) => item.id === band.id);
+        if (!previous || JSON.stringify(previous) === JSON.stringify(band)) continue;
+        setSyncStatus('서버에 저장 중…');
+        try {
+          await saveRemoteWorkspace(previous, band);
+          acknowledged.current = acknowledged.current.map((item) =>
+            item.id === band.id ? band : item,
+          );
+        } catch (error) {
+          failed.current = true;
+          setSyncStatus('서버 저장 실패');
+          setActionError(
+            (error instanceof Error ? error.message : '서버 저장 실패') +
+              ' 현재 변경 내용은 화면에 남아 있습니다. 기록을 백업한 뒤 서버 기록을 새로 불러와주세요.',
+          );
+          return;
+        }
+      }
+      setSyncStatus('서버 저장됨');
+    });
+  }, [workspaces, selectedWorkspaceId]);
+  const value = useMemo(
     () => ({
-      recommendations,
-      adoptedSongs,
-      members,
-      selectedRecommendationId,
-      addRecommendation: (song) => setRecommendations((current) => [song, ...current]),
-      selectRecommendation: setSelectedRecommendationId,
-      adoptSong: (id) => {
-        const song = recommendations.find((item) => item.id === id);
-        if (!song) return;
-        setAdoptedSongs((current) =>
-          current.some((item) => item.id === id)
-            ? current
-            : [...current, { ...song, ready: 0, total: members.length, status: 'PRACTICING' }],
-        );
-      },
-      isAdopted: (id) => adoptedSongs.some((song) => song.id === id),
-      updateMember: (id, changes) =>
-        setMembers((current) =>
-          current.map((member) => (member.id === id ? { ...member, ...changes } : member)),
-        ),
-      removeMember: (id) => setMembers((current) => current.filter((member) => member.id !== id)),
+      workspaces,
+      setWorkspaces,
+      selectedWorkspaceId,
+      selectWorkspace,
+      storageError,
+      actionError,
+      setActionError,
+      syncStatus,
+      reloadRemote,
     }),
-    [adoptedSongs, members, recommendations, selectedRecommendationId],
+    [workspaces, selectedWorkspaceId, storageError, actionError, syncStatus, reloadRemote],
   );
-
-  return <MockAppStateContext.Provider value={value}>{children}</MockAppStateContext.Provider>;
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
-// Provider와 목 상태 훅을 한 파일에서 함께 관리한다.
 // eslint-disable-next-line react-refresh/only-export-components
 export function useMockAppState() {
-  const context = useContext(MockAppStateContext);
-  if (!context) throw new Error('useMockAppState must be used inside MockAppStateProvider.');
-  return context;
+  const currentUserId = useIdentity();
+  const preferences = usePreferences();
+  const store = useContext(StoreContext);
+  const scopeId = useContext(WorkspaceScope);
+  const [selectedRecommendationId, selectRecommendation] = useState('creep');
+  if (!store) throw new Error('useMockAppState must be used inside MockAppStateProvider.');
+  const { workspaces, setWorkspaces, selectedWorkspaceId, selectWorkspace } = store;
+  const workspaceId = scopeId ?? selectedWorkspaceId;
+  const workspace = workspaces.find((item) => item.id === workspaceId);
+  const update = (fn: (workspace: Workspace) => Workspace, id = workspaceId) =>
+    setWorkspaces((all) => all.map((item) => (item.id === id ? fn(item) : item)));
+  const recommendations = (workspace?.recommendations ?? []).map((song) => ({
+    ...song,
+    likedByMe: song.likedBy?.includes(currentUserId) ?? song.likedByMe,
+    votedByMe: song.votedBy?.includes(currentUserId) ?? song.votedByMe,
+    comments:
+      (workspace?.documents?.[`recommendation/${song.id}/comments`] as unknown[] | undefined)
+        ?.length ?? 0,
+  }));
+  const adoptedSongs = (workspace?.adoptedSongs ?? []).map((song) => ({
+    ...summarizeSong(song, currentUserId),
+    comments:
+      (workspace?.documents?.[`song/${song.id}/discussion`] as unknown[] | undefined)?.length ?? 0,
+  }));
+  const members = (workspace?.members ?? []).map((member) =>
+    member.id === currentUserId
+      ? { ...member, name: preferences.name, initials: preferences.name.slice(-2) }
+      : member,
+  );
+  const canManage = members.find((member) => member.id === currentUserId)?.role === 'OWNER';
+  return {
+    workspaces,
+    workspace,
+    workspaceId,
+    selectedWorkspaceId,
+    selectWorkspace,
+    storageError: store.storageError,
+    currentUserId,
+    serverConfigured,
+    syncStatus: store.syncStatus,
+    reloadRemote: store.reloadRemote,
+    actionError: store.actionError,
+    clearActionError: () => store.setActionError(''),
+    setDocument: <T,>(key: string, value: T | ((previous: T) => T), initial: T) =>
+      update((band) => ({
+        ...band,
+        documents: {
+          ...band.documents,
+          [key]:
+            typeof value === 'function'
+              ? (value as (previous: T) => T)((band.documents?.[key] as T | undefined) ?? initial)
+              : value,
+        },
+      })),
+    updateSong: (id: string, changes: Partial<WorkspaceSong>) => {
+      if (!canManage) return;
+      update((band) => ({
+        ...band,
+        adoptedSongs: band.adoptedSongs.map((song) =>
+          song.id === id
+            ? summarizeSong({ ...song, ...changes, id: song.id }, currentUserId)
+            : song,
+        ),
+      }));
+    },
+    toggleReaction: (id: string, kind: 'like' | 'vote') =>
+      update((band) => ({
+        ...band,
+        recommendations: band.recommendations.map((song) => {
+          if (song.id !== id) return song;
+          const flag = kind === 'like' ? 'likedByMe' : 'votedByMe';
+          const count = kind === 'like' ? 'likes' : 'votes';
+          const people = kind === 'like' ? 'likedBy' : 'votedBy';
+          const active = song[people]?.includes(currentUserId) ?? false;
+          return {
+            ...song,
+            [people]: active
+              ? (song[people] ?? []).filter((id) => id !== currentUserId)
+              : [...(song[people] ?? []), currentUserId],
+            [flag]: !active,
+            [count]: Math.max(0, song[count] + (active ? -1 : 1)),
+          };
+        }),
+      })),
+    deferRecommendation: (id: string, reason: string) => {
+      if (!canManage) return;
+      update((band) => ({
+        ...band,
+        recommendations: band.recommendations.map((song) =>
+          song.id === id
+            ? { ...song, deferred: !song.deferred, deferredReason: reason.trim() }
+            : song,
+        ),
+      }));
+    },
+    deleteRecommendation: (id: string) => {
+      const song = recommendations.find((item) => item.id === id);
+      if (!canManage && song?.authorId !== currentUserId) return;
+      update((band) => ({
+        ...band,
+        recommendations: band.recommendations.filter((item) => item.id !== id),
+      }));
+    },
+    recommendations,
+    editRecommendation: (
+      id: string,
+      changes: Pick<RecommendationItem, 'title' | 'artist' | 'reason' | 'referenceUrl'>,
+    ) => {
+      const song = recommendations.find((item) => item.id === id);
+      if (
+        !song ||
+        (!canManage && song.authorId !== currentUserId) ||
+        !changes.title.trim() ||
+        !changes.artist.trim()
+      )
+        return false;
+      if (changes.referenceUrl && !/^https?:\/\//.test(changes.referenceUrl)) return false;
+      if (
+        changes.referenceUrl &&
+        recommendations.some((item) => item.id !== id && item.referenceUrl === changes.referenceUrl)
+      )
+        return false;
+      update((band) => ({
+        ...band,
+        recommendations: band.recommendations.map((item) =>
+          item.id === id ? { ...item, ...changes } : item,
+        ),
+      }));
+      return true;
+    },
+    adoptedSongs,
+    members,
+    canManage,
+    rehearsals: workspace?.rehearsals ?? [],
+    allSongs: personalSongs(workspaces, currentUserId),
+    allRehearsals: personalRehearsals(workspaces),
+    selectedRecommendationId,
+    selectRecommendation,
+    addRecommendation: (song: RecommendationItem) => {
+      if (
+        recommendations.some((item) => item.referenceUrl && item.referenceUrl === song.referenceUrl)
+      ) {
+        store.setActionError('이미 추천된 링크입니다. 기존 추천곡을 확인해주세요.');
+        return false;
+      }
+      update((band) => ({
+        ...band,
+        recommendations: [{ ...song, authorId: currentUserId }, ...band.recommendations],
+      }));
+      return true;
+    },
+    adoptSong: (id: string) => {
+      if (!canManage) return;
+      update((band) => {
+        const song = band.recommendations.find((item) => item.id === id);
+        if (!song || band.adoptedSongs.some((item) => item.id === id)) return band;
+        return {
+          ...band,
+          adoptedSongs: [
+            ...band.adoptedSongs,
+            {
+              ...song,
+              ready: 0,
+              total: band.members.length,
+              status: 'PRACTICING',
+              myStatus: 'NOT_READY',
+              myPart: band.members.find((member) => member.id === currentUserId)?.part ?? '',
+              participants: Object.fromEntries(
+                band.members.map((member) => [
+                  member.id,
+                  { part: member.part, status: 'NOT_READY' as const },
+                ]),
+              ),
+            },
+          ],
+        };
+      });
+    },
+    isAdopted: (id: string) => adoptedSongs.some((song) => song.id === id),
+    updatePreparation: (bandId: string, songId: string, status: Preparation) =>
+      update((band) => setSongPreparation(band, songId, status, currentUserId), bandId),
+    saveRehearsal: (event: Rehearsal, bandId = workspaceId) => {
+      if (!canManage) {
+        store.setActionError('합주 일정은 Owner가 변경할 수 있습니다.');
+        return;
+      }
+      update(
+        (band) => ({
+          ...band,
+          rehearsals: [...band.rehearsals.filter((item) => item.id !== event.id), event],
+        }),
+        bandId,
+      );
+    },
+    cancelRehearsal: (id: string) => {
+      if (!canManage) return;
+      update((band) => ({
+        ...band,
+        rehearsals: band.rehearsals.map((event) =>
+          event.id === id ? { ...event, cancelled: !event.cancelled } : event,
+        ),
+      }));
+    },
+    updateMember: (id: string, changes: Pick<MockMember, 'part' | 'role'>) => {
+      if (!canManage) return;
+      if (
+        changes.role !== 'OWNER' &&
+        members.find((member) => member.id === id)?.role === 'OWNER' &&
+        members.filter((member) => member.role === 'OWNER').length === 1
+      ) {
+        store.setActionError(
+          '마지막 Owner는 변경할 수 없습니다. 다른 멤버를 먼저 Owner로 지정해주세요.',
+        );
+        return false;
+      }
+      update((band) => ({
+        ...band,
+        members: band.members.map((member) =>
+          member.id === id ? { ...member, ...changes } : member,
+        ),
+        adoptedSongs: band.adoptedSongs.map((song) =>
+          song.participants?.[id]
+            ? summarizeSong(
+                {
+                  ...song,
+                  participants: {
+                    ...song.participants,
+                    [id]: { ...song.participants[id], part: changes.part },
+                  },
+                },
+                currentUserId,
+              )
+            : song,
+        ),
+      }));
+      return true;
+    },
+    removeMember: (id: string) => {
+      if (!canManage || id === currentUserId) return;
+      update((band) =>
+        normalizeWorkspace(
+          { ...band, members: band.members.filter((member) => member.id !== id) },
+          currentUserId,
+        ),
+      );
+    },
+    createWorkspace: async (name: string) => {
+      if (serverConfigured) {
+        const created = await createRemoteWorkspace(name);
+        await store.reloadRemote();
+        selectWorkspace(created.id);
+        return created.id;
+      }
+      const id = `ws-${Date.now()}`;
+      setWorkspaces((all) => [
+        ...all,
+        {
+          id,
+          name: name.trim(),
+          description: '함께 만들어갈 새로운 음악 공간',
+          color: '#43896b',
+          members: [{ ...initialMembers[0] }],
+          recommendations: [],
+          adoptedSongs: [],
+          rehearsals: [],
+        },
+      ]);
+      selectWorkspace(id);
+      return id;
+    },
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useWorkspaceValue<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
+  const { workspace, setDocument } = useMockAppState();
+  const value = (workspace?.documents?.[key] as T | undefined) ?? initial;
+  return [value, (next) => setDocument(key, next, initial)];
 }

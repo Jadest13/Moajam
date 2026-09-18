@@ -124,6 +124,7 @@ const ModalFooter = styled.View`
 `;
 
 const StatusText = styled.Text<{ error?: boolean }>`
+  font-weight: 400;
   color: ${({ error }) => (error ? theme.colors.danger : theme.colors.textMuted)};
   font-size: 13px;
   line-height: 19px;
@@ -156,10 +157,11 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
     addRecommendation,
     isAdopted,
     selectRecommendation,
+    workspace,
+    toggleReaction,
   } = useMockAppState();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'최신순' | '인기순'>('최신순');
-  const [liked, setLiked] = useState<string[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [referenceUrl, setReferenceUrl] = useState('');
   const [title, setTitle] = useState('');
@@ -236,7 +238,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
     const reference = parseYouTubeUrl(referenceUrl);
     if (!reference || !title.trim() || !artist.trim()) return;
 
-    addRecommendation({
+    const added = addRecommendation({
       id: `recommendation-${Date.now()}`,
       title: title.trim(),
       artist: artist.trim(),
@@ -250,7 +252,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
       thumbnailUrl: thumbnailUrl || reference.thumbnailUrl,
       referenceUrl: reference.canonicalUrl,
     });
-    closeForm();
+    if (added) closeForm();
   };
 
   const isSaveDisabled =
@@ -296,9 +298,19 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
           <SectionTitle>추천곡 {filtered.length}</SectionTitle>
           <Muted>최근 댓글까지 카드에서 바로 확인하세요</Muted>
         </Between>
+        {filtered.length === 0 ? (
+          <View style={{ padding: 24, gap: 8 }}>
+            <Body>{songs.length ? '검색한 곡이 없어요.' : '아직 추천한 곡이 없어요.'}</Body>
+            <Muted>
+              {songs.length
+                ? '다른 곡명이나 아티스트로 검색해보세요.'
+                : '곡 추천하기로 첫 후보를 등록해보세요.'}
+            </Muted>
+          </View>
+        ) : null}
         <View style={{ flexDirection: width < 900 ? 'column' : 'row', flexWrap: 'wrap', gap: 16 }}>
-          {filtered.map((song, index) => {
-            const isLiked = liked.includes(song.id);
+          {filtered.map((song) => {
+            const isLiked = song.likedByMe ?? false;
             return (
               <Recommendation
                 key={song.id}
@@ -308,7 +320,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                 }}
                 style={[
                   { gap: 14, overflow: 'hidden' },
-                  width < 900 ? undefined : { width: '48.8%' },
+                  width < 900 ? { width: '100%' } : { width: '48.8%' },
                 ]}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -321,7 +333,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                   )}
                   <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                     <FlexBetween>
-                      <Body style={{ flex: 1, fontWeight: '800' }}>{song.title}</Body>
+                      <Body style={{ flex: 1, fontWeight: '500' }}>{song.title}</Body>
                       {isAdopted(song.id) ? (
                         <Pill tone="green">
                           <PillText tone="green">이미 채택된 곡</PillText>
@@ -335,11 +347,14 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                   </View>
                 </View>
                 <LatestComment style={{ gap: 3 }}>
-                  <Label>{index % 2 ? '이영희 · Vocal' : '김민수 · Guitar'}</Label>
+                  <Label>{song.deferred ? '보류된 추천' : '최근 의견'}</Label>
                   <Muted numberOfLines={2}>
-                    {index % 2
-                      ? '다 같이 부를 수 있는 후렴이라 무대에서 좋을 것 같아요.'
-                      : '톤을 조금 가볍게 잡으면 우리 밴드 스타일에도 잘 맞겠어요.'}
+                    {song.deferred
+                      ? song.deferredReason || '다음 선곡 때 다시 논의해요.'
+                      : ((
+                          workspace?.documents?.[`recommendation/${song.id}/comments`] as
+                            { text: string }[] | undefined
+                        )?.at(0)?.text ?? '첫 의견을 남겨보세요.')}
                   </Muted>
                 </LatestComment>
                 <Between>
@@ -347,13 +362,11 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                     <Text
                       onPress={(event) => {
                         event.stopPropagation();
-                        setLiked((current) =>
-                          isLiked ? current.filter((id) => id !== song.id) : [...current, song.id],
-                        );
+                        toggleReaction(song.id, 'like');
                       }}
                       style={{ color: isLiked ? theme.colors.danger : theme.colors.textMuted }}
                     >
-                      ♥ {song.likes + (isLiked ? 1 : 0)}
+                      ♥ {song.likes}
                     </Text>
                     <Muted>🎸 {song.votes}</Muted>
                     <Muted>▢ {song.comments}</Muted>
@@ -398,7 +411,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                 <UrlPanel style={{ gap: 12 }}>
                   <FlexRow gap={9}>
                     <StepBadge>
-                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '900' }}>1</Text>
+                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>1</Text>
                     </StepBadge>
                     <View style={{ flex: 1 }}>
                       <Label>YouTube 링크 붙여넣기</Label>
@@ -449,10 +462,10 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                         style={width < 560 ? { width: '100%', height: 170 } : undefined}
                       />
                       <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-                        <Meta style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                        <Meta style={{ color: theme.colors.primary, fontWeight: '500' }}>
                           불러온 영상
                         </Meta>
-                        <Copy numberOfLines={2} style={{ fontWeight: '900' }}>
+                        <Copy numberOfLines={2} style={{ fontWeight: '600' }}>
                           {title || '곡 제목을 불러오는 중이에요'}
                         </Copy>
                         <Meta numberOfLines={1}>{artist || '아티스트 확인 중'}</Meta>
@@ -480,7 +493,7 @@ export function RecommendationsScreen({ navigate }: ScreenProps) {
                 <View style={{ gap: 14 }}>
                   <FlexRow gap={9}>
                     <StepBadge>
-                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '900' }}>2</Text>
+                      <Text style={{ color: 'white', fontSize: 12, fontWeight: '600' }}>2</Text>
                     </StepBadge>
                     <View>
                       <Label>곡 정보 확인</Label>

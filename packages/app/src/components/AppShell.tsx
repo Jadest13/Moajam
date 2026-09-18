@@ -1,11 +1,16 @@
 import styled from '@emotion/native';
 import { Stack, theme } from '@moajam/ui';
-import type { PropsWithChildren } from 'react';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { useState, type PropsWithChildren } from 'react';
+import { useIdentity } from '../state/Identity';
+import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import moajamLogo from '../../assets/logo.png';
-import type { AppRoute } from '../navigation';
+import type { AppRoute, ScreenProps } from '../navigation';
+import { Notifications } from './Notifications';
+import { usePreferences } from '../state/preferences';
+import { useMockAppState } from '../state/MockAppState';
 import { Avatar, AvatarText, Main, PageScroll, Shell } from '../styles/layout';
-import { ComingSoonOverlay } from './ProductUI';
+import { ActionButton, Copy, FlexRow, Heading, Meta, Surface } from './ProductUI';
+import { Input } from '../styles/layout';
 import { AppIcon, type AppIconName } from './icons';
 
 const brandLogoSource = typeof moajamLogo === 'string' ? { uri: moajamLogo } : moajamLogo;
@@ -13,9 +18,11 @@ const brandLogoSource = typeof moajamLogo === 'string' ? { uri: moajamLogo } : m
 const Sidebar = styled.View`
   width: 232px;
   min-height: 100%;
-  padding: 22px 16px;
+  padding: 16px 12px;
   justify-content: space-between;
-  background-color: #101d35;
+  background-color: #f8fafc;
+  border-right-width: 1px;
+  border-right-color: ${theme.colors.border};
 `;
 
 const BrandMark = styled.Image`
@@ -30,21 +37,21 @@ const BrandButton = styled.Pressable`
   align-items: center;
 `;
 
-const BrandName = styled.Text<{ dark?: boolean }>`
-  color: ${({ dark }) => (dark ? theme.colors.text : 'white')};
+const BrandName = styled.Text`
+  color: ${theme.colors.text};
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 600;
 `;
 
-const WorkspaceSwitcher = styled.View`
-  margin: 24px 0 18px;
+const WorkspaceSwitcher = styled.Pressable`
+  margin: 4px 0 10px;
   padding: 12px;
   gap: 10px;
   flex-direction: row;
   align-items: center;
-  border: 1px solid #2c3b55;
+  border: 1px solid #e1e7f0;
   border-radius: 12px;
-  background-color: #192943;
+  background-color: white;
 `;
 
 const WorkspaceThumb = styled.View`
@@ -56,19 +63,19 @@ const WorkspaceThumb = styled.View`
   background-color: #f3a45b;
 `;
 
-const WhiteText = styled.Text<{ small?: boolean }>`
-  color: white;
+const SidebarText = styled.Text<{ small?: boolean }>`
+  color: ${({ small }) => (small ? theme.colors.textMuted : theme.colors.text)};
   font-size: ${({ small }) => (small ? 11 : 14)}px;
-  font-weight: ${({ small }) => (small ? 500 : 700)};
+  font-weight: ${({ small }) => (small ? 400 : 500)};
 `;
 
 const NavItem = styled.Pressable<{ active?: boolean }>`
-  padding: 11px 12px;
+  padding: 7px 12px;
   gap: 12px;
   flex-direction: row;
   align-items: center;
   border-radius: 10px;
-  background-color: ${({ active }) => (active ? '#253653' : 'transparent')};
+  background-color: ${({ active }) => (active ? '#eaf0fc' : 'transparent')};
 `;
 
 const NavIcon = styled.View`
@@ -78,16 +85,16 @@ const NavIcon = styled.View`
 `;
 
 const NavLabel = styled.Text<{ active?: boolean }>`
-  color: ${({ active }) => (active ? 'white' : '#aab6ca')};
+  color: ${({ active }) => (active ? theme.colors.primary : '#56657c')};
   font-size: 14px;
-  font-weight: ${({ active }) => (active ? 700 : 500)};
+  font-weight: ${({ active }) => (active ? 500 : 400)};
 `;
 
 const NavGroupLabel = styled.Text`
-  margin: 22px 12px 8px;
+  margin: 14px 12px 6px;
   color: #72819a;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 const Profile = styled.View`
@@ -96,17 +103,33 @@ const Profile = styled.View`
   flex-direction: row;
   align-items: center;
   border-top-width: 1px;
-  border-top-color: #2b3951;
+  border-top-color: ${theme.colors.border};
 `;
 
-const MobileHeader = styled.View`
-  padding: 14px 18px;
+const Topbar = styled.View`
+  height: 64px;
+  flex-shrink: 0;
+  padding: 0 24px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   border-bottom-width: 1px;
   border-bottom-color: ${theme.colors.border};
   background-color: white;
+`;
+
+const TopbarTitle = styled.Text`
+  color: ${theme.colors.text};
+  font-size: 14px;
+  font-weight: 500;
+`;
+
+const TopbarAction = styled.Pressable`
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
 `;
 
 const BottomNav = styled.View`
@@ -127,205 +150,304 @@ const BottomItem = styled.Pressable`
 const BottomLabel = styled.Text<{ active?: boolean }>`
   color: ${({ active }) => (active ? theme.colors.primary : theme.colors.textMuted)};
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
-const navItems: Array<{ icon: AppIconName; label: string; route: AppRoute }> = [
+const bandItems: Array<{ icon: AppIconName; label: string; route: AppRoute }> = [
   { icon: 'home', label: '홈', route: 'home' },
   { icon: 'sparkles', label: '곡 추천', route: 'recommendations' },
   { icon: 'songs', label: '채택곡', route: 'songs' },
-  { icon: 'rehearsal', label: '합주', route: 'rehearsals' },
+  { icon: 'calendar', label: '합주', route: 'rehearsals' },
   { icon: 'users', label: '멤버', route: 'members' },
 ];
-
-const personalItems: Array<{ icon: AppIconName; label: string; route: AppRoute }> = [
-  { icon: 'sparkles', label: '내 악기 추출', route: 'instrument' },
-  { icon: 'songs', label: '악보 편집', route: 'score-editor' },
+const personalItems: typeof bandItems = [
+  { icon: 'home', label: '홈', route: 'personal-home' },
+  { icon: 'calendar', label: '합주 일정', route: 'personal-rehearsals' },
+  { icon: 'songs', label: '참여 곡', route: 'personal-songs' },
+  { icon: 'rehearsal', label: '연습실', route: 'personal-practice' },
 ];
-
-const activeGroup = (current: AppRoute, target: AppRoute) => {
-  if (target === 'recommendations')
-    return current === 'recommendations' || current === 'recommendation';
-  if (target === 'songs')
-    return current === 'songs' || current === 'song' || current === 'practice';
-  return current === target;
+const pageTitles: Record<AppRoute, string> = {
+  'personal-home': '홈',
+  'personal-rehearsals': '합주 일정',
+  'personal-songs': '참여 곡',
+  'personal-practice': '연습실',
+  home: '홈',
+  recommendations: '곡 추천',
+  recommendation: '곡 추천 상세',
+  songs: '채택곡',
+  song: '곡 상세',
+  practice: '연습실',
+  rehearsals: '합주',
+  members: '멤버',
+  instrument: '내 악기 추출',
+  'score-editor': '악보 편집',
+  settings: '설정',
+  help: '도움말',
 };
 
+const activeGroup = (current: AppRoute, target: AppRoute) => {
+  if (target === 'recommendations') return current === target || current === 'recommendation';
+  if (target === 'songs') return current === target || current === 'song';
+  if (target === 'personal-practice')
+    return ['personal-practice', 'practice', 'instrument', 'score-editor'].includes(current);
+  return current === target;
+};
 interface AppShellProps {
   activeRoute: AppRoute;
-  onNavigate: (route: AppRoute) => void;
-  comingSoon?: string;
-  onComingSoonBack?: () => void;
+  onNavigate: ScreenProps['navigate'];
 }
-
-export function AppShell({
-  children,
-  activeRoute,
-  onNavigate,
-  comingSoon,
-  onComingSoonBack,
-}: PropsWithChildren<AppShellProps>) {
+export function AppShell({ children, activeRoute, onNavigate }: PropsWithChildren<AppShellProps>) {
+  const profile = usePreferences();
+  const currentUserId = useIdentity();
   const { width } = useWindowDimensions();
   const desktop = width >= 900;
-  const compact = width < 620;
-
+  const {
+    workspaces,
+    workspace,
+    members,
+    selectWorkspace,
+    createWorkspace,
+    storageError,
+    actionError,
+    clearActionError,
+    syncStatus,
+    serverConfigured,
+    reloadRemote,
+  } = useMockAppState();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+  const [creatingBusy, setCreatingBusy] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [confirmReload, setConfirmReload] = useState(false);
+  const personal =
+    activeRoute.startsWith('personal-') ||
+    ['practice', 'instrument', 'score-editor'].includes(activeRoute);
+  const accountPage = activeRoute === 'settings' || activeRoute === 'help';
+  const spaceLabel = accountPage
+    ? 'Moajam'
+    : personal
+      ? '개인 공간'
+      : (workspace?.name ?? '밴드 공간');
+  const choose = (id: string) => {
+    selectWorkspace(id);
+    setSwitcherOpen(false);
+    onNavigate('home', { workspaceId: id });
+  };
+  const nav = (items: typeof bandItems) =>
+    items.map((item) => {
+      const active = activeGroup(activeRoute, item.route);
+      return (
+        <NavItem
+          key={item.route}
+          active={active}
+          accessibilityRole="button"
+          accessibilityState={{ selected: active }}
+          onPress={() => onNavigate(item.route)}
+          style={{ gap: 12 }}
+        >
+          <NavIcon>
+            <AppIcon name={item.icon} color={active ? theme.colors.primary : '#56657c'} size={18} />
+          </NavIcon>
+          <NavLabel active={active}>{item.label}</NavLabel>
+        </NavItem>
+      );
+    });
+  const switcher = (
+    <WorkspaceSwitcher
+      accessibilityRole="button"
+      accessibilityLabel="밴드 변경"
+      accessibilityState={{ expanded: switcherOpen }}
+      onPress={() => setSwitcherOpen(true)}
+      style={{ gap: 10 }}
+    >
+      <WorkspaceThumb style={{ backgroundColor: workspace?.color ?? '#43896b' }}>
+        <AppIcon name="guitar" color="white" size={20} />
+      </WorkspaceThumb>
+      <View style={{ flex: 1 }}>
+        <SidebarText numberOfLines={1}>{workspace?.name ?? '밴드 선택'}</SidebarText>
+        <SidebarText small>{members.length}명의 멤버</SidebarText>
+      </View>
+      <AppIcon name="chevron-down" color="#7b879f" size={16} />
+    </WorkspaceSwitcher>
+  );
   return (
     <Shell>
       {desktop && (
-        <Sidebar>
-          <View>
+        <Sidebar style={{ paddingHorizontal: 12 }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
             <BrandButton
               accessibilityRole="button"
-              accessibilityLabel="Moajam 홈으로 이동"
-              onPress={() => onNavigate('home')}
-              style={{ gap: 14 }}
+              accessibilityLabel="개인 홈으로 이동"
+              onPress={() => onNavigate('personal-home')}
+              style={{ gap: 10, paddingHorizontal: 4 }}
             >
               <BrandMark source={brandLogoSource} resizeMode="contain" />
               <BrandName>Moajam</BrandName>
             </BrandButton>
-            <WorkspaceSwitcher style={{ gap: 10 }}>
-              <WorkspaceThumb>
-                <AppIcon name="guitar" color="#713411" size={20} strokeWidth={2} />
-              </WorkspaceThumb>
-              <View style={{ flex: 1 }}>
-                <WhiteText>주말 합주단</WhiteText>
-                <WhiteText small style={{ fontSize: 11, fontWeight: '500' }}>
-                  5명의 멤버
-                </WhiteText>
-              </View>
-              <AppIcon name="chevron-down" color="#aab6ca" size={16} />
-            </WorkspaceSwitcher>
-            <Stack gap={4}>
-              {navItems.map((item) => {
-                const active = activeGroup(activeRoute, item.route);
-                return (
-                  <NavItem
-                    key={item.route}
-                    active={active}
-                    onPress={() => onNavigate(item.route)}
-                    style={{ gap: 12 }}
-                  >
-                    <NavIcon>
-                      <AppIcon name={item.icon} color={active ? 'white' : '#aab6ca'} size={18} />
-                    </NavIcon>
-                    <NavLabel active={active}>{item.label}</NavLabel>
-                  </NavItem>
-                );
-              })}
-            </Stack>
-            <NavGroupLabel>내 작업실</NavGroupLabel>
-            <Stack gap={4}>
-              {personalItems.map((item) => {
-                const active = activeGroup(activeRoute, item.route);
-                return (
-                  <NavItem
-                    key={item.route}
-                    active={active}
-                    onPress={() => onNavigate(item.route)}
-                    style={{ gap: 12 }}
-                  >
-                    <NavIcon>
-                      <AppIcon name={item.icon} color={active ? 'white' : '#aab6ca'} size={18} />
-                    </NavIcon>
-                    <NavLabel active={active}>{item.label}</NavLabel>
-                  </NavItem>
-                );
-              })}
-            </Stack>
-          </View>
-          <View>
-            <Stack gap={4} style={{ marginBottom: 18 }}>
-              <NavItem
-                active={activeRoute === 'settings'}
-                onPress={() => onNavigate('settings')}
-                style={{ gap: 12 }}
-              >
-                <NavIcon>
-                  <AppIcon
-                    name="settings"
-                    color={activeRoute === 'settings' ? 'white' : '#aab6ca'}
-                    size={18}
-                  />
-                </NavIcon>
-                <NavLabel active={activeRoute === 'settings'}>설정</NavLabel>
-              </NavItem>
-              <NavItem
-                active={activeRoute === 'help'}
-                onPress={() => onNavigate('help')}
-                style={{ gap: 12 }}
-              >
-                <NavIcon>
-                  <AppIcon
-                    name="help"
-                    color={activeRoute === 'help' ? 'white' : '#aab6ca'}
-                    size={18}
-                  />
-                </NavIcon>
-                <NavLabel active={activeRoute === 'help'}>도움말</NavLabel>
-              </NavItem>
+            <NavGroupLabel>개인 공간</NavGroupLabel>
+            <Stack gap={2}>{nav(personalItems)}</Stack>
+            <NavGroupLabel>밴드 공간</NavGroupLabel>
+            {switcher}
+            <Stack gap={2}>{workspace ? nav(bandItems) : null}</Stack>
+          </ScrollView>
+          <View style={{ paddingTop: 16 }}>
+            <Stack gap={2} style={{ marginBottom: 12 }}>
+              {nav([
+                { icon: 'settings', label: '설정', route: 'settings' },
+                { icon: 'help', label: '도움말', route: 'help' },
+              ])}
             </Stack>
             <Profile style={{ gap: 10 }}>
               <Avatar color="#ffd8c8">
-                <AvatarText>민수</AvatarText>
+                <AvatarText>{profile.name.slice(-2)}</AvatarText>
               </Avatar>
               <View>
-                <WhiteText>김민수</WhiteText>
-                <WhiteText small style={{ fontSize: 11, fontWeight: '500' }}>
-                  Guitar · Owner
-                </WhiteText>
+                <SidebarText>{profile.name}</SidebarText>
+                <SidebarText small>나의 음악, 우리의 합주</SidebarText>
               </View>
             </Profile>
           </View>
         </Sidebar>
       )}
       <Main>
-        {!desktop && (
-          <MobileHeader>
-            <BrandButton
-              accessibilityRole="button"
-              accessibilityLabel="Moajam 홈으로 이동"
-              onPress={() => onNavigate('home')}
-              style={{ gap: 14 }}
+        <Topbar style={{ paddingHorizontal: desktop ? 28 : 16 }}>
+          <View
+            style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+          >
+            {!desktop && (
+              <BrandButton
+                accessibilityRole="button"
+                accessibilityLabel="개인 홈으로 이동"
+                onPress={() => onNavigate('personal-home')}
+              >
+                <BrandMark
+                  source={brandLogoSource}
+                  resizeMode="contain"
+                  style={{ width: 32, height: 32 }}
+                />
+              </BrandButton>
+            )}
+            <View
+              style={{
+                flex: 1,
+                minWidth: 0,
+                flexDirection: desktop ? 'row' : 'column',
+                alignItems: desktop ? 'center' : 'flex-start',
+                gap: desktop ? 12 : 2,
+              }}
             >
-              <BrandMark source={brandLogoSource} resizeMode="contain" />
-              <BrandName dark>Moajam</BrandName>
-            </BrandButton>
-            <Pressable
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={accountPage ? '개인 홈으로 이동' : '공간 변경'}
+                onPress={() => (accountPage ? onNavigate('personal-home') : setSwitcherOpen(true))}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  maxWidth: desktop ? 260 : '100%',
+                }}
+              >
+                <Meta numberOfLines={1} style={{ flexShrink: 1 }}>
+                  {spaceLabel}
+                </Meta>
+                {!accountPage && (
+                  <AppIcon name="chevron-down" size={13} color={theme.colors.textMuted} />
+                )}
+              </Pressable>
+              {desktop && <AppIcon name="chevron-right" size={14} color="#b3bdcc" />}
+              <TopbarTitle numberOfLines={1}>{pageTitles[activeRoute]}</TopbarTitle>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 12 }}>
+            <ActionButton
+              secondary
+              compact
+              onPress={() => setNotificationsOpen(!notificationsOpen)}
+            >
+              알림
+            </ActionButton>
+            <TopbarAction
               accessibilityRole="button"
-              accessibilityLabel="설정 열기"
+              accessibilityLabel="도움말 열기"
+              onPress={() => onNavigate('help')}
+            >
+              <AppIcon name="help" size={19} color="#7b879f" />
+            </TopbarAction>
+            <TopbarAction
+              accessibilityRole="button"
+              accessibilityLabel="내 프로필과 설정"
               onPress={() => onNavigate('settings')}
             >
-              <Avatar color="#ffd8c8">
-                <AvatarText>민수</AvatarText>
+              <Avatar color="#eef2f8" size={30}>
+                <AvatarText>{profile.name.slice(-2)}</AvatarText>
               </Avatar>
-            </Pressable>
-          </MobileHeader>
-        )}
+            </TopbarAction>
+          </View>
+        </Topbar>
         <PageScroll
           contentContainerStyle={{
-            padding: compact ? 16 : 28,
+            padding: width < 620 ? 16 : 28,
             gap: 20,
             width: '100%',
             maxWidth: 1260,
             alignSelf: 'center',
           }}
         >
+          {serverConfigured ? (
+            <FlexRow wrap>
+              <Meta>{syncStatus}</Meta>
+              <ActionButton secondary compact onPress={() => setConfirmReload(true)}>
+                서버 기록 새로 불러오기
+              </ActionButton>
+              {confirmReload ? (
+                <Surface>
+                  <Meta>
+                    저장되지 않은 화면 변경을 서버 기록으로 교체합니다. 필요한 기록은 설정에서 먼저
+                    백업해주세요.
+                  </Meta>
+                  <FlexRow>
+                    <ActionButton secondary onPress={() => setConfirmReload(false)}>
+                      취소
+                    </ActionButton>
+                    <ActionButton
+                      onPress={() => {
+                        setConfirmReload(false);
+                        void reloadRemote();
+                      }}
+                    >
+                      서버 기록으로 교체
+                    </ActionButton>
+                  </FlexRow>
+                </Surface>
+              ) : null}
+            </FlexRow>
+          ) : null}
+          {storageError && (
+            <Meta accessibilityRole="alert" style={{ color: '#be3b4b' }}>
+              브라우저에 변경 내용을 저장하지 못했어요. 새로고침하면 변경 내용이 사라질 수 있습니다.
+            </Meta>
+          )}
+          {actionError ? (
+            <Surface danger>
+              <Copy accessibilityRole="alert">{actionError}</Copy>
+              <ActionButton secondary onPress={clearActionError}>
+                확인
+              </ActionButton>
+            </Surface>
+          ) : null}
+          {notificationsOpen ? <Notifications /> : null}
           {children}
         </PageScroll>
-        {comingSoon ? (
-          <ComingSoonOverlay
-            label={comingSoon}
-            onBack={onComingSoonBack}
-            style={{ top: desktop ? 0 : 73, bottom: desktop ? 0 : 67 }}
-          />
-        ) : null}
         {!desktop && (
           <BottomNav>
-            {navItems.map((item) => {
+            {(personal ? personalItems : bandItems).map((item) => {
               const active = activeGroup(activeRoute, item.route);
               return (
                 <BottomItem
                   key={item.route}
+                  accessibilityRole="button"
                   onPress={() => onNavigate(item.route)}
                   style={{ gap: 3 }}
                 >
@@ -341,6 +463,125 @@ export function AppShell({
           </BottomNav>
         )}
       </Main>
+      <Modal
+        visible={switcherOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSwitcherOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+            backgroundColor: 'rgba(16,29,53,0.48)',
+          }}
+        >
+          <Surface style={{ width: '100%', maxWidth: 410, maxHeight: '90%' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Heading>공간 변경</Heading>
+              <ActionButton secondary compact onPress={() => setSwitcherOpen(false)}>
+                닫기
+              </ActionButton>
+            </View>
+            <ActionButton
+              secondary
+              onPress={() => {
+                setSwitcherOpen(false);
+                onNavigate('personal-home');
+              }}
+            >
+              개인 공간 · 모든 밴드 모아보기
+            </ActionButton>
+            <Meta>내 밴드</Meta>
+            <ScrollView style={{ maxHeight: 310 }} contentContainerStyle={{ gap: 8 }}>
+              {workspaces.map((band) => (
+                <Pressable
+                  key={band.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${band.name} 선택`}
+                  onPress={() => choose(band.id)}
+                  style={{
+                    padding: 14,
+                    borderRadius: 12,
+                    backgroundColor: band.id === workspace?.id ? '#edf3ff' : '#f7f9fc',
+                    borderLeftWidth: 4,
+                    borderLeftColor: band.color,
+                  }}
+                >
+                  <Copy style={{ fontWeight: '500' }}>
+                    {band.name}
+                    {band.id === workspace?.id ? ' ✓' : ''}
+                  </Copy>
+                  <Meta>
+                    {band.members.find((member) => member.id === currentUserId)?.part} ·{' '}
+                    {band.members.find((member) => member.id === currentUserId)?.role === 'OWNER'
+                      ? '관리자'
+                      : '멤버'}{' '}
+                    · {band.members.length}명
+                  </Meta>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {creating ? (
+              <View style={{ gap: 8 }}>
+                <Input
+                  accessibilityLabel="새 밴드 이름"
+                  placeholder="새 밴드 이름"
+                  value={name}
+                  onChangeText={setName}
+                  maxLength={40}
+                />
+                <ActionButton
+                  disabled={creatingBusy || !name.trim()}
+                  onPress={() => {
+                    if (!name.trim()) return;
+                    setCreatingBusy(true);
+                    setCreateError('');
+                    void createWorkspace(name)
+                      .then((id) => {
+                        setCreating(false);
+                        setName('');
+                        choose(id);
+                      })
+                      .catch((error: unknown) =>
+                        setCreateError(
+                          error instanceof Error ? error.message : '밴드를 만들지 못했습니다.',
+                        ),
+                      )
+                      .finally(() => setCreatingBusy(false));
+                  }}
+                >
+                  밴드 만들기
+                </ActionButton>
+                {createError ? <Meta accessibilityRole="alert">{createError}</Meta> : null}
+              </View>
+            ) : (
+              <ActionButton secondary onPress={() => setCreating(true)}>
+                + 밴드 만들기
+              </ActionButton>
+            )}
+            {!desktop && (
+              <ActionButton
+                secondary
+                onPress={() => {
+                  setSwitcherOpen(false);
+                  onNavigate('settings');
+                }}
+              >
+                설정
+              </ActionButton>
+            )}
+          </Surface>
+        </View>
+      </Modal>
     </Shell>
   );
 }

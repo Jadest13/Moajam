@@ -4,7 +4,7 @@ import { theme } from '@moajam/ui';
 export const HomeTitle = styled.Text`
   color: ${theme.colors.text};
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.5px;
 `;
 
@@ -69,7 +69,7 @@ export const SongRow = styled.Pressable`
 export const SongName = styled.Text`
   color: ${theme.colors.text};
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const StatusDots = styled.View`
@@ -95,7 +95,7 @@ export const PracticeButton = styled.Pressable`
 export const PracticeButtonText = styled.Text`
   color: white;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const BottomGrid = styled.View<{ stacked?: boolean }>`
@@ -120,5 +120,5 @@ export const CandidateSurface = styled.Pressable`
 export const CountText = styled.Text`
   color: ${theme.colors.danger};
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 `;

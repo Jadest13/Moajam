@@ -24,22 +24,23 @@ export const PageHeader = styled.View`
 export const PageTitle = styled.Text`
   color: ${theme.colors.text};
   font-size: 26px;
-  font-weight: 900;
+  font-weight: 600;
 `;
 
 export const SectionTitle = styled.Text`
   color: ${theme.colors.text};
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const Label = styled.Text`
   color: ${theme.colors.text};
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 export const Caption = styled.Text`
+  font-weight: 400;
   color: ${theme.colors.textMuted};
   font-size: 13px;
   line-height: 19px;
@@ -95,6 +96,7 @@ export const Divider = styled.View`
 `;
 
 export const Input = styled.TextInput`
+  font-weight: 400;
   min-height: 44px;
   padding: 10px 13px;
   color: ${theme.colors.text};
@@ -104,6 +106,7 @@ export const Input = styled.TextInput`
 `;
 
 export const SearchInput = styled.TextInput`
+  font-weight: 400;
   flex: 1;
   min-height: 42px;
   padding: 10px 14px;
@@ -122,13 +125,13 @@ export const Chip = styled.Pressable<{ active?: boolean }>`
 export const ChipText = styled.Text<{ active?: boolean }>`
   color: ${({ active }) => (active ? 'white' : theme.colors.textMuted)};
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 export const LinkText = styled.Text`
   color: ${theme.colors.primary};
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
 `;
 
 const ArtworkBase = styled.View`
@@ -153,7 +156,7 @@ export function Artwork({
 export const ArtworkText = styled.Text`
   color: white;
   font-size: 25px;
-  font-weight: 900;
+  font-weight: 600;
 `;
 
 export const ArtworkImage = styled.Image`
@@ -199,7 +202,7 @@ export function Avatar({
 export const AvatarText = styled.Text`
   color: #23324d;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 `;
 
 export const EmptyState = styled.View`

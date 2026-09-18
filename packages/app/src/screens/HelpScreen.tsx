@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 import { AppShell } from '../components/AppShell';
 import {
-  ActionButton,
   Copy,
   FlexBetween,
   FlexRow,
@@ -18,24 +17,39 @@ import {
   Surface,
 } from '../components/ProductUI';
 import { AppIcon } from '../components/icons';
-import type { ScreenProps } from '../navigation';
+import type { AppRoute, ScreenProps } from '../navigation';
 import { Input } from '../styles/layout';
 
-const guides = [
-  ['처음 시작하기', '워크스페이스를 만들고 멤버를 초대하는 방법'],
-  ['곡 추천과 채택', '후보를 추천하고 팀의 연습곡으로 정하는 흐름'],
-  ['멀티트랙 연습', '스템, 악보, 멤버 녹음을 함께 재생하는 방법'],
-  ['녹음과 악기 추출', '내 연주를 기록하고 악기 소리만 분리하는 방법'],
+const guides: { title: string; detail: string; route: AppRoute }[] = [
+  { title: '개인 홈', detail: '내 밴드의 일정과 참여 곡을 모아보기', route: 'personal-home' },
+  {
+    title: '곡 추천과 채택',
+    detail: '선택한 밴드에서 후보를 추천하고 연습곡으로 정하기',
+    route: 'recommendations',
+  },
+  {
+    title: '멀티트랙 연습',
+    detail: '파일을 올리고 함께 재생하거나 내 연주 녹음하기',
+    route: 'personal-practice',
+  },
+  {
+    title: '내 악기 추출',
+    detail: '원본 업로드, 악기 분리 요청과 결과 비교',
+    route: 'instrument',
+  },
 ];
 const faqs = [
-  ['스템 분리는 어떤 파일을 지원하나요?', 'MP3, WAV, M4A 파일을 지원하며 고음질 WAV를 권장합니다.'],
   [
-    '내 녹음이 다른 멤버에게 공개되나요?',
-    '저장할 때 공개 범위를 나만 보기, 팀 공개 중에서 선택할 수 있습니다.',
+    '연습실에서 어떤 파일을 사용할 수 있나요?',
+    '기기에서 재생할 수 있는 100MB 이하 오디오를 추가할 수 있습니다. 악기 분리는 웹의 내 악기 추출에서 요청하며, 로그인과 분리 작업 서버 연결이 필요합니다.',
   ],
   [
-    '악보와 음원 싱크가 맞지 않아요.',
-    '악보 편집 화면의 싱크 포인트에서 마디 시작 시점을 조정해보세요.',
+    '내 녹음이 다른 멤버에게 공개되나요?',
+    '연습실의 녹음은 이 브라우저에 저장되어 새로고침 후에도 유지됩니다. 멤버나 다른 기기에는 자동으로 공유되지 않습니다. 중요한 파일은 내려받아 별도로 보관해주세요.',
+  ],
+  [
+    '개인 화면과 밴드 화면은 어떻게 다른가요?',
+    '개인 화면에서는 소속 밴드의 일정과 곡을 모아봅니다. 밴드 화면에서는 선택한 밴드의 추천곡, 채택곡, 합주와 멤버를 관리합니다. 사이드바 상단에서 밴드를 바꿀 수 있습니다.',
   ],
 ];
 
@@ -43,7 +57,9 @@ export function HelpScreen({ navigate }: ScreenProps) {
   const { width } = useWindowDimensions();
   const [open, setOpen] = useState(0);
   const [query, setQuery] = useState('');
-  const visible = guides.filter(([title, detail]) => `${title}${detail}`.includes(query));
+  const visible = guides.filter(({ title, detail }) =>
+    `${title}${detail}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   return (
     <AppShell activeRoute="help" onNavigate={navigate}>
       <Surface tint="#eef4ff" style={{ paddingVertical: 28 }}>
@@ -62,23 +78,30 @@ export function HelpScreen({ navigate }: ScreenProps) {
       <ResponsiveGrid stacked={width < 850}>
         <Stack gap={12} style={width < 850 ? undefined : { flex: 1.2 }}>
           <Heading>주요 가이드</Heading>
-          {visible.map(([title, detail], index) => (
-            <Pressable
-              key={title}
-              onPress={() =>
-                navigate(index === 2 ? 'practice' : index === 3 ? 'instrument' : 'home')
-              }
-            >
+          {visible.length === 0 ? (
+            <Surface>
+              <Copy>검색한 가이드가 없어요.</Copy>
+              <Meta>다른 기능 이름으로 검색해보세요.</Meta>
+            </Surface>
+          ) : null}
+          {visible.map(({ title, detail, route }) => (
+            <Pressable key={title} accessibilityRole="button" onPress={() => navigate(route)}>
               <Surface>
                 <FlexRow>
                   <SoftIcon>
                     <AppIcon
-                      name={index === 2 ? 'songs' : index === 3 ? 'guitar' : 'help'}
+                      name={
+                        route === 'personal-practice'
+                          ? 'songs'
+                          : route === 'instrument'
+                            ? 'guitar'
+                            : 'help'
+                      }
                       color={theme.colors.primary}
                     />
                   </SoftIcon>
                   <View style={{ flex: 1 }}>
-                    <Copy style={{ fontWeight: '900' }}>{title}</Copy>
+                    <Copy style={{ fontWeight: '600' }}>{title}</Copy>
                     <Meta>{detail}</Meta>
                   </View>
                   <AppIcon name="chevron-right" color={theme.colors.textMuted} />
@@ -93,7 +116,7 @@ export function HelpScreen({ navigate }: ScreenProps) {
             {faqs.map(([question, answer], index) => (
               <Pressable
                 key={question}
-                onPress={() => setOpen(index)}
+                onPress={() => setOpen(open === index ? -1 : index)}
                 style={{
                   paddingVertical: 9,
                   borderBottomWidth: index < faqs.length - 1 ? 1 : 0,
@@ -101,7 +124,7 @@ export function HelpScreen({ navigate }: ScreenProps) {
                 }}
               >
                 <FlexBetween>
-                  <Copy style={{ flex: 1, fontWeight: '800' }}>{question}</Copy>
+                  <Copy style={{ flex: 1, fontWeight: '500' }}>{question}</Copy>
                   <Copy>{open === index ? '−' : '+'}</Copy>
                 </FlexBetween>
                 {open === index ? <Meta style={{ marginTop: 8 }}>{answer}</Meta> : null}
@@ -110,8 +133,10 @@ export function HelpScreen({ navigate }: ScreenProps) {
           </Surface>
           <Surface tint="#f8faff">
             <Heading>답을 찾지 못했나요?</Heading>
-            <Meta>문의 내용을 남기면 영업일 기준 1일 이내에 답변드릴게요.</Meta>
-            <ActionButton onPress={() => undefined}>문의하기</ActionButton>
+            <Meta>
+              문의 접수 채널은 아직 연결되지 않았습니다. 정식 문의 창구가 마련되면 이곳에서
+              안내합니다.
+            </Meta>
           </Surface>
         </Stack>
       </ResponsiveGrid>
